@@ -48,4 +48,4 @@ $("settingsForm").addEventListener("submit",async e=>{e.preventDefault();const f
 $("syncNow").addEventListener("click",async()=>{try{await POSSynchroniser.run()}catch(e){toast("Sync not completed: "+e.message)}});
 function connection(){const online=navigator.onLine;$("onlineDot").classList.toggle("online",online);$("connectionText").textContent=online?"Internet available":"Offline mode";if(!online)setSyncUI("Working offline","Sales remain saved on this device.");}
 window.addEventListener("online",()=>{connection();POSSynchroniser.run().catch(()=>{})});window.addEventListener("offline",connection);
-(async()=>{await POSDB.open();$("year").textContent=new Date().getFullYear();await refresh();connection();if("serviceWorker"in navigator)navigator.serviceWorker.register("./service-worker.js").catch(console.error)})();
+(async()=>{await POSDB.open();$("year").textContent=new Date().getFullYear();await refresh();await HelpCentre.init();connection();if("serviceWorker"in navigator)navigator.serviceWorker.register("./service-worker.js").catch(console.error)})();
