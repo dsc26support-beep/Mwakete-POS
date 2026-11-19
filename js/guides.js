@@ -201,8 +201,25 @@ const GuidesCore = (() => {
     },
   ].map((l) => Object.assign({ source: "official" }, l));
 
-  const LIMITS = { title: 80, note: 500, url: 2000, resources: 100, recent: 8 };
+  const LIMITS = {
+    title: 80,
+    note: 500,
+    url: 2000,
+    resources: 100,
+    recent: 8,
+    report: 1000,
+    reports: 50,
+  };
+  // Set to a verified Mwakete support address to enable the "Email" button. Empty = button hidden.
+  const SUPPORT_EMAIL = "";
+  const REPORT_CATEGORIES = [
+    { id: "guide", title: "A guide is wrong or unclear" },
+    { id: "app", title: "Something in the app is not working" },
+    { id: "sync", title: "Sync problem" },
+    { id: "other", title: "Something else" },
+  ];
   const KEYS = {
+    reports: "helpReports",
     resources: "helpResources",
     bookmarks: "helpBookmarks",
     recent: "helpRecent",
@@ -353,7 +370,100 @@ const GuidesCore = (() => {
   }
   const listRecent = (store) => readList(store, KEYS.recent);
 
+  /* ---------- problem reports (saved locally; NEVER marked as sent) ---------- */
+  function validateReport(input) {
+    const category = REPORT_CATEGORIES.find((c) => c.id === input?.category);
+    if (!category)
+      return { ok: false, error: "Choose what the problem is about." };
+    const message = String(input?.message ?? "").trim();
+    if (message.length < 5)
+      return {
+        ok: false,
+        error: "Describe the problem (at least a few words).",
+      };
+    if (message.length > LIMITS.report)
+      return {
+        ok: false,
+        error:
+          "Description is too long (max " + LIMITS.report + " characters).",
+      };
+    const known = OFFICIAL_GUIDES.some((g) => g.id === input?.guideId);
+    return {
+      ok: true,
+      value: {
+        category: category.id,
+        message,
+        guideId: known ? input.guideId : "",
+      },
+    };
+  }
+  async function addReport(store, input, id, now = Date.now()) {
+    const v = validateReport(input);
+    if (!v.ok) return v;
+    const list = await readList(store, KEYS.reports);
+    if (list.length >= LIMITS.reports)
+      return {
+        ok: false,
+        error: "Too many saved reports. Remove old ones first.",
+      };
+    const item = Object.assign(
+      { id, createdAt: now, status: "saved" },
+      v.value,
+    );
+    list.push(item);
+    await writeList(store, KEYS.reports, list);
+    return { ok: true, item };
+  }
+  const listReports = (store) => readList(store, KEYS.reports);
+  async function removeReport(store, id) {
+    const list = await readList(store, KEYS.reports);
+    const next = list.filter((r) => r.id !== id);
+    await writeList(store, KEYS.reports, next);
+    return next.length !== list.length;
+  }
+  // Plain text for copy / email. Diagnostics are opt-in and contain no sales, product or customer data.
+  function buildReportText(report, diagnostics) {
+    const cat = REPORT_CATEGORIES.find((c) => c.id === report.category);
+    const guide = OFFICIAL_GUIDES.find((g) => g.id === report.guideId);
+    const lines = [
+      "Mwakete POS problem report",
+      "Topic: " + (cat ? cat.title : report.category),
+    ];
+    if (guide) lines.push("Guide: " + guide.title);
+    lines.push(
+      "Date: " + new Date(report.createdAt).toISOString(),
+      "",
+      report.message,
+    );
+    if (diagnostics && typeof diagnostics === "object") {
+      lines.push("", "Diagnostics (shared by choice):");
+      for (const k of ["appVersion", "online", "userAgent"])
+        if (k in diagnostics)
+          lines.push("- " + k + ": " + String(diagnostics[k]).slice(0, 300));
+    }
+    return lines.join("\n");
+  }
+  function mailtoUrl(email, report, diagnostics) {
+    if (!/^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/.test(String(email ?? "")))
+      return "";
+    const subject = "Mwakete POS problem report";
+    return (
+      "mailto:" +
+      email +
+      "?subject=" +
+      encodeURIComponent(subject) +
+      "&body=" +
+      encodeURIComponent(buildReportText(report, diagnostics))
+    );
+  }
+
   /* ---------- HTML builders (all dynamic text escaped) ---------- */
+  function reportRow(r, canEmail) {
+    const cat = REPORT_CATEGORIES.find((c) => c.id === r.category);
+    const guide = OFFICIAL_GUIDES.find((g) => g.id === r.guideId);
+    const when = new Date(r.createdAt).toLocaleString();
+    return `<div class="resource-row"><div><strong>${esc(cat ? cat.title : "Report")}</strong><small>${esc(when)}${guide ? " · " + esc(guide.title) : ""} · <b>Not sent</b> — saved on this device only</small><p class="note-text">${esc(r.message)}</p></div><div class="row-actions"><button class="text-button" data-copy-report="${esc(r.id)}">Copy</button>${canEmail ? `<button class="text-button" data-email-report="${esc(r.id)}">Email</button>` : ""}<button class="text-button" data-remove-report="${esc(r.id)}">Remove</button></div></div>`;
+  }
   function externalLink(item) {
     const u = normalizeUrl(item.url);
     if (!u.ok)
@@ -365,7 +475,7 @@ const GuidesCore = (() => {
   }
   function guideDetail(g, bookmarked) {
     const steps = g.steps.map((s) => `<li>${esc(s)}</li>`).join("");
-    return `<div class="guide-detail"><button class="text-button" data-guide-back>← All guides</button><p class="eyebrow">${esc((CATEGORIES.find((c) => c.id === g.category) || {}).title || "")}</p><h3>${esc(g.title)}</h3><p class="muted">${esc(g.subtitle)}</p><ol class="steps">${steps}</ol><button class="button secondary" data-bookmark="${esc(g.id)}" aria-pressed="${bookmarked}">${bookmarked ? "★ Bookmarked" : "☆ Bookmark this guide"}</button></div>`;
+    return `<div class="guide-detail"><button class="text-button" data-guide-back>← All guides</button><p class="eyebrow">${esc((CATEGORIES.find((c) => c.id === g.category) || {}).title || "")}</p><h3>${esc(g.title)}</h3><p class="muted">${esc(g.subtitle)}</p><ol class="steps">${steps}</ol><button class="button secondary" data-bookmark="${esc(g.id)}" aria-pressed="${bookmarked}">${bookmarked ? "★ Bookmarked" : "☆ Bookmark this guide"}</button> <button class="text-button" data-report-guide="${esc(g.id)}">Report a problem with this guide</button></div>`;
   }
   function resourceRow(r) {
     const body =
@@ -396,6 +506,15 @@ const GuidesCore = (() => {
     guideCard,
     guideDetail,
     resourceRow,
+    SUPPORT_EMAIL,
+    REPORT_CATEGORIES,
+    validateReport,
+    addReport,
+    listReports,
+    removeReport,
+    buildReportText,
+    mailtoUrl,
+    reportRow,
   };
 })();
 if (typeof module !== "undefined") module.exports = GuidesCore;

@@ -54,6 +54,22 @@ const HelpCentre = (() => {
     $("businessResources").innerHTML = resources.length
       ? resources.map(C.resourceRow).join("")
       : '<p class="empty">No business links or notes yet.</p>';
+    const reports = await C.listReports(POSDB);
+    $("reportList").innerHTML = reports.length
+      ? reports.map((r) => C.reportRow(r, !!C.SUPPORT_EMAIL)).join("")
+      : '<p class="empty">No saved reports.</p>';
+  }
+
+  // Opt-in technical details only: no sales, product or customer data.
+  function diagnostics() {
+    return {
+      appVersion: "shell-v3",
+      online: navigator.onLine,
+      userAgent: navigator.userAgent,
+    };
+  }
+  async function findReport(id) {
+    return (await C.listReports(POSDB)).find((r) => r.id === id);
   }
 
   async function init() {
@@ -87,8 +103,78 @@ const HelpCentre = (() => {
       await render();
       toast("Saved on this device.");
     });
+    const reportForm = $("reportForm");
+    reportForm.elements.category.innerHTML =
+      '<option value="">Choose…</option>' +
+      C.REPORT_CATEGORIES.map(
+        (c) => `<option value="${C.esc(c.id)}">${C.esc(c.title)}</option>`,
+      ).join("");
+    reportForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = reportForm.elements;
+      const r = await C.addReport(
+        POSDB,
+        {
+          category: f.category.value,
+          message: f.message.value,
+          guideId: f.guideId.value,
+        },
+        newId(),
+      );
+      if (!r.ok) return toast(r.error);
+      const keep = f.diagnostics.checked;
+      reportForm.reset();
+      f.diagnostics.checked = keep;
+      await render();
+      toast("Report saved on this device. It has NOT been sent.");
+    });
     document.addEventListener("click", async (e) => {
       const t = e.target;
+      const rg = t.closest("[data-report-guide]");
+      if (rg) {
+        reportForm.elements.guideId.value = rg.dataset.reportGuide;
+        reportForm.elements.category.value = "guide";
+        $("reportPanel").scrollIntoView({ behavior: "smooth" });
+        reportForm.elements.message.focus();
+        return;
+      }
+      const cp = t.closest("[data-copy-report]");
+      if (cp) {
+        const r = await findReport(cp.dataset.copyReport);
+        if (!r) return;
+        const text = C.buildReportText(
+          r,
+          reportForm.elements.diagnostics.checked ? diagnostics() : null,
+        );
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("Report copied. Paste it into a message to support.");
+        } catch {
+          prompt("Copy this report:", text);
+        }
+        return;
+      }
+      const em = t.closest("[data-email-report]");
+      if (em) {
+        const r = await findReport(em.dataset.emailReport);
+        const url =
+          r &&
+          C.mailtoUrl(
+            C.SUPPORT_EMAIL,
+            r,
+            reportForm.elements.diagnostics.checked ? diagnostics() : null,
+          );
+        if (url) location.href = url;
+        return;
+      }
+      const rr = t.closest("[data-remove-report]");
+      if (rr) {
+        if (confirm("Remove this saved report from this device?")) {
+          await C.removeReport(POSDB, rr.dataset.removeReport);
+          render();
+        }
+        return;
+      }
       const ext = t.closest("a[data-ext]");
       if (ext) {
         if (

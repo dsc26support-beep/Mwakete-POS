@@ -19,6 +19,7 @@ Before production:
 - Business links and notes are untrusted input: every value is HTML-escaped on render, and links are re-validated at render time (https only, no credentials, no localhost/IP/intranet hosts, no `javascript:` / `data:`).
 - External links use `rel="noopener noreferrer"` and show a confirmation naming the destination domain.
 - Business notes are stored unencrypted in the browser on that device and are visible to anyone with access to the browser profile. Users are warned not to store passwords, tokens or keys there.
+- Problem reports are stored locally, escaped on render, length-limited (1000 chars, 50 reports) and never transmitted by the app. Copy/Email are user-initiated; the diagnostics block is opt-in and allow-listed (app version, online flag, browser string) so sales, products, customers and the backend URL can never leak into a report. The mailto address must be a single valid address set in code.
 - Any local user can currently add/remove business links; there are no owner/cashier roles until the authenticated backend exists.
 
 Report vulnerabilities privately to the repository owner. Do not publish exploit details before a fix is available.

@@ -98,6 +98,18 @@
         </form>
         <div id="businessResources"></div>
       </div>
+      <div class="panel" id="reportPanel">
+        <p class="eyebrow">NEED HELP?</p><h2>Report a problem</h2>
+        <p class="hint">Reports are <strong>saved on this device and are not sent automatically</strong>. After saving, use Copy (or Email, when a support address is set up) to pass it on. Do not include passwords. Never paste customer or payment details.</p>
+        <form id="reportForm" class="settings-form">
+          <input type="hidden" name="guideId" value="">
+          <label>What is it about?<select name="category" required><option value="">Choose…</option></select></label>
+          <label>Describe the problem<textarea name="message" rows="4" maxlength="1000" required placeholder="What did you do, and what happened?"></textarea></label>
+          <label class="check"><input type="checkbox" name="diagnostics"> Include technical details when I copy or email (app version, online status, browser)</label>
+          <button class="button primary" type="submit">Save report</button>
+        </form>
+        <div id="reportList"></div>
+      </div>
     </section>
     <footer>© <span id="year"></span> Mwakete POS · Built for businesses in Kiribati</footer>
   </main>
