@@ -1,0 +1,17 @@
+{
+  "name": "Mwakete POS",
+  "short_name": "Mwakete POS",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f4fb",
+  "theme_color": "#17112b",
+  "description": "Free offline-first point of sale",
+  "icons": [
+    {
+      "src": "./assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

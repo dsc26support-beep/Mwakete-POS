@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#17112b">
+  <meta name="description" content="Mwakete POS — free, offline-first point of sale for businesses.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/app.css">
+  <title>Mwakete POS</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">M</span><span>Mwakete <small>POS</small></span></a>
+    <div class="connection"><span id="onlineDot"></span><span id="connectionText">Checking connection…</span></div>
+  </header>
+  <main class="shell">
+    <section class="welcome">
+      <div><p class="eyebrow">YOUR BUSINESS, YOUR CONTROL</p><h1>Simple sales. Even offline.</h1><p>Run your counter, track stock and keep selling when the internet drops.</p></div>
+      <div class="sync-card"><span class="sync-icon">↻</span><div><strong id="syncStatus">Ready to work</strong><small id="syncDetail">Your sales are saved on this device.</small></div><button id="syncNow" class="button secondary">Sync now</button></div>
+    </section>
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab active" data-view="sale">Quick sale</button>
+      <button class="tab" data-view="products">Products</button>
+      <button class="tab" data-view="sales">Sales history</button>
+      <button class="tab" data-view="setup">Business setup</button>
+    </nav>
+    <section id="view-sale" class="view">
+      <div class="workspace">
+        <div class="panel catalog">
+          <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Choose products</h2></div><input id="productSearch" class="search" placeholder="Search or scan barcode…" autocomplete="off"></div>
+          <div id="productGrid" class="product-grid"></div>
+          <p id="emptyProducts" class="empty hidden">No products yet. Add your first product in Products.</p>
+        </div>
+        <aside class="panel cart">
+          <div class="section-heading"><div><p class="eyebrow">CURRENT SALE</p><h2>Cart <span id="cartCount" class="count">0</span></h2></div><button id="clearCart" class="text-button">Clear</button></div>
+          <div id="cartItems" class="cart-items"><p class="empty">Your cart is empty.</p></div>
+          <div class="totals"><div><span>Subtotal</span><strong id="subtotal">0.00</strong></div><div class="grand"><span>Total</span><strong id="total">0.00</strong></div></div>
+          <label class="field-label" for="paymentMethod">Payment method</label>
+          <select id="paymentMethod"><option value="cash">Cash</option><option value="other">Other (record only)</option></select>
+          <button id="checkout" class="button primary full" disabled>Complete cash sale</button>
+          <p class="hint">Offline cash sales are saved on this device and queued for sync. “Other” payments are not verified by this app.</p>
+        </aside>
+      </div>
+    </section>
+    <section id="view-products" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">INVENTORY</p><h2>Products</h2></div></div>
+        <form id="productForm" class="product-form">
+          <label>Product name<input name="name" required maxlength="100" placeholder="e.g. Bottled water"></label>
+          <label>Price<input name="price" type="number" min="0" step="0.01" required placeholder="0.00"></label>
+          <label>Opening stock<input name="stock" type="number" min="0" step="1" value="0" required></label>
+          <label>Barcode / SKU<input name="sku" maxlength="80" placeholder="Optional"></label>
+          <button class="button primary" type="submit">Add product</button>
+        </form>
+        <div id="productTable" class="table-wrap"></div>
+      </div>
+    </section>
+    <section id="view-sales" class="view hidden">
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div><div id="salesList"></div></div>
+    </section>
+    <section id="view-setup" class="view hidden">
+      <div class="panel setup-panel">
+        <p class="eyebrow">GET STARTED</p><h2>Set up your business</h2>
+        <p class="muted">Your business name and currency are stored locally on this device. Connect a Google backend when the secure provisioning service is configured.</p>
+        <form id="settingsForm" class="settings-form">
+          <label>Business name<input name="businessName" maxlength="100" placeholder="Your business name" required></label>
+          <label>Currency code<input name="currency" maxlength="8" value="AUD" required></label>
+          <label>Google Apps Script Web App URL<input name="apiUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
+          <button class="button primary" type="submit">Save settings</button>
+        </form>
+        <div class="notice"><strong>Google connection safety</strong><p>Never enter your Google password here. The production Google sign-in and automatic spreadsheet / Apps Script provisioning flow requires a verified Google OAuth client and deployment configuration. This starter does not pretend that provisioning is already active.</p></div>
+        <div class="notice"><strong>Mwakete Marketplace connection</strong><p>The Mwakete adapter is a documented integration boundary. It must be connected to verified existing Mwakete authentication and APIs before marketplace accounts or live inventory are enabled.</p></div>
+      </div>
+    </section>
+    <footer>© <span id="year"></span> Mwakete POS · Built for businesses in Kiribati</footer>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./js/db.js"></script>
+  <script src="./js/integrations/google.js"></script>
+  <script src="./js/integrations/mwakete.js"></script>
+  <script src="./js/sync.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
