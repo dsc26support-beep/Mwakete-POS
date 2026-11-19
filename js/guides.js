@@ -211,7 +211,13 @@ const GuidesCore = (() => {
     reports: 50,
   };
   // Set to a verified Mwakete support address to enable the "Email" button. Empty = button hidden.
-  const SUPPORT_EMAIL = "";
+  const SUPPORT_EMAIL = "admin@mwakete.com";
+  // Official support channels, supplied by the Mwakete owner. Phone is shown exactly as given (no country code assumed).
+  const SUPPORT_CONTACTS = {
+    email: SUPPORT_EMAIL,
+    messenger: "https://m.me/moote.nakau",
+    phone: "73052765",
+  };
   const REPORT_CATEGORIES = [
     { id: "guide", title: "A guide is wrong or unclear" },
     { id: "app", title: "Something in the app is not working" },
@@ -458,6 +464,23 @@ const GuidesCore = (() => {
   }
 
   /* ---------- HTML builders (all dynamic text escaped) ---------- */
+  function supportContacts() {
+    const c = SUPPORT_CONTACTS,
+      rows = [];
+    if (/^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/.test(c.email))
+      rows.push(
+        `<div class="resource-row"><div><strong><a class="contact-link" href="mailto:${esc(c.email)}">Email: ${esc(c.email)}</a></strong><small>Opens your email app</small></div></div>`,
+      );
+    if (normalizeUrl(c.messenger).ok)
+      rows.push(
+        `<div class="resource-row"><div><strong>${externalLink({ title: "Messenger chat", url: c.messenger })}</strong><small>Opens Messenger</small></div></div>`,
+      );
+    if (/^[0-9]{5,15}$/.test(c.phone))
+      rows.push(
+        `<div class="resource-row"><div><strong><a class="contact-link" href="tel:${esc(c.phone)}">Phone: ${esc(c.phone)}</a></strong><small>Opens your phone app</small></div></div>`,
+      );
+    return rows.join("");
+  }
   function reportRow(r, canEmail) {
     const cat = REPORT_CATEGORIES.find((c) => c.id === r.category);
     const guide = OFFICIAL_GUIDES.find((g) => g.id === r.guideId);
@@ -507,6 +530,8 @@ const GuidesCore = (() => {
     guideDetail,
     resourceRow,
     SUPPORT_EMAIL,
+    SUPPORT_CONTACTS,
+    supportContacts,
     REPORT_CATEGORIES,
     validateReport,
     addReport,

@@ -47,10 +47,13 @@ const HelpCentre = (() => {
       }
       $("helpList").innerHTML = html;
     }
-    $("officialLinks").innerHTML = C.OFFICIAL_LINKS.map(
-      (l) =>
-        `<div class="resource-row"><div><strong>${C.externalLink(l)}</strong><small>${C.esc(l.note)}</small></div></div>`,
-    ).join("");
+    $("officialLinks").innerHTML =
+      C.OFFICIAL_LINKS.map(
+        (l) =>
+          `<div class="resource-row"><div><strong>${C.externalLink(l)}</strong><small>${C.esc(l.note)}</small></div></div>`,
+      ).join("") +
+      "<h3>Contact Mwakete Support</h3>" +
+      C.supportContacts();
     $("businessResources").innerHTML = resources.length
       ? resources.map(C.resourceRow).join("")
       : '<p class="empty">No business links or notes yet.</p>';
@@ -63,7 +66,7 @@ const HelpCentre = (() => {
   // Opt-in technical details only: no sales, product or customer data.
   function diagnostics() {
     return {
-      appVersion: "shell-v3",
+      appVersion: "shell-v4",
       online: navigator.onLine,
       userAgent: navigator.userAgent,
     };

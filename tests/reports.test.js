@@ -119,8 +119,22 @@ test("mailto link is only built for a valid configured address", () => {
   assert.ok(url.includes(encodeURIComponent("Hello & goodbye")));
 });
 
-test("no support email is shipped until one is verified", () => {
-  assert.equal(G.SUPPORT_EMAIL, "");
+test("support contacts are the owner-supplied ones and render safely", () => {
+  assert.equal(G.SUPPORT_EMAIL, "admin@mwakete.com");
+  assert.equal(G.SUPPORT_CONTACTS.messenger, "https://m.me/moote.nakau");
+  assert.equal(G.SUPPORT_CONTACTS.phone, "73052765");
+  assert.ok(
+    G.mailtoUrl(G.SUPPORT_EMAIL, {
+      category: "app",
+      message: "hello there",
+      createdAt: 0,
+    }).startsWith("mailto:admin@mwakete.com?"),
+  );
+  const html = G.supportContacts();
+  assert.match(html, /href="mailto:admin@mwakete\.com"/);
+  assert.match(html, /href="tel:73052765"/);
+  assert.match(html, /data-ext="m\.me"/);
+  assert.match(html, /rel="noopener noreferrer"/);
 });
 
 test("report rows escape text and state clearly that nothing was sent", () => {

@@ -1,4 +1,4 @@
-const CACHE="mwakete-pos-shell-v3";
+const CACHE="mwakete-pos-shell-v4";
 const FILES=["./","./index.html","./manifest.webmanifest","./css/app.css","./js/db.js","./js/app.js","./js/sync.js","./js/guides.js","./js/help.js","./js/integrations/google.js","./js/integrations/mwakete.js","./assets/icon.svg"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
