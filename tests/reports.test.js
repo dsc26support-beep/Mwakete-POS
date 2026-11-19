@@ -122,7 +122,7 @@ test("mailto link is only built for a valid configured address", () => {
 test("support contacts are the owner-supplied ones and render safely", () => {
   assert.equal(G.SUPPORT_EMAIL, "admin@mwakete.com");
   assert.equal(G.SUPPORT_CONTACTS.messenger, "https://m.me/moote.nakau");
-  assert.equal(G.SUPPORT_CONTACTS.phone, "73052765");
+  assert.equal(G.SUPPORT_CONTACTS.phone, "+68673052765");
   assert.ok(
     G.mailtoUrl(G.SUPPORT_EMAIL, {
       category: "app",
@@ -132,7 +132,8 @@ test("support contacts are the owner-supplied ones and render safely", () => {
   );
   const html = G.supportContacts();
   assert.match(html, /href="mailto:admin@mwakete\.com"/);
-  assert.match(html, /href="tel:73052765"/);
+  assert.match(html, /href="tel:\+68673052765"/);
+  assert.match(html, /Phone: \+686 73052765/);
   assert.match(html, /data-ext="m\.me"/);
   assert.match(html, /rel="noopener noreferrer"/);
 });

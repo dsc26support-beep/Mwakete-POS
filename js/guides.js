@@ -216,7 +216,8 @@ const GuidesCore = (() => {
   const SUPPORT_CONTACTS = {
     email: SUPPORT_EMAIL,
     messenger: "https://m.me/moote.nakau",
-    phone: "73052765",
+    phone: "+68673052765",
+    phoneDisplay: "+686 73052765",
   };
   const REPORT_CATEGORIES = [
     { id: "guide", title: "A guide is wrong or unclear" },
@@ -475,9 +476,9 @@ const GuidesCore = (() => {
       rows.push(
         `<div class="resource-row"><div><strong>${externalLink({ title: "Messenger chat", url: c.messenger })}</strong><small>Opens Messenger</small></div></div>`,
       );
-    if (/^[0-9]{5,15}$/.test(c.phone))
+    if (/^\+[0-9]{8,15}$/.test(c.phone))
       rows.push(
-        `<div class="resource-row"><div><strong><a class="contact-link" href="tel:${esc(c.phone)}">Phone: ${esc(c.phone)}</a></strong><small>Opens your phone app</small></div></div>`,
+        `<div class="resource-row"><div><strong><a class="contact-link" href="tel:${esc(c.phone)}">Phone: ${esc(c.phoneDisplay)}</a></strong><small>Opens your phone app</small></div></div>`,
       );
     return rows.join("");
   }
