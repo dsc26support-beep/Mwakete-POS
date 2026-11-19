@@ -9,6 +9,22 @@ Standalone, no-build-step PWA starter for a free, offline-first point of sale.
 - Local cash sale recording and pending-sync status.
 - Unique transaction IDs and an Apps Script sample using `LockService` and duplicate-ID checks.
 - Explicit integration boundaries for Google and Mwakete.
+- **Help & guides tab (Guides & Links)** — hybrid management model:
+  - *Official guides and links* (Mwakete-managed) are bundled in `js/guides.js`, cached by the service worker, and work offline. They are updated through normal app releases and are read-only for businesses.
+  - *Business links and staff notes* (owner-managed) are stored locally in the IndexedDB `settings` store (keys `helpResources`, `helpBookmarks`, `helpRecent`). They are **per device only**: not synced, not shared with staff on other devices, not encrypted. No schema migration; existing products, sales and settings are untouched.
+  - Search (title, subtitle, description), categories, step-by-step guides, bookmarks, recently viewed.
+  - External links: https only, no embedded credentials, no localhost/IP/intranet hosts, `rel="noopener noreferrer"`, and a confirmation naming the destination site before leaving the app.
+  - **Not implemented yet:** admin publish/update/archive UI and remote guide updates (needs the authenticated Mwakete backend), owner-vs-cashier permissions, cross-device sync of business links, screenshots, video tutorials, "report a problem", and official Marketplace/Support links (real URLs must be confirmed before adding them to `OFFICIAL_LINKS`).
+  - To change an official guide, edit `OFFICIAL_GUIDES` in `js/guides.js`, and bump `CACHE` in `service-worker.js` so devices refresh.
+
+## Tests
+No build step or dependencies. Requires Node 20+:
+
+```powershell
+npm test
+```
+
+`tests/guides.test.js` covers guide integrity, search, URL safety, business link/note storage, bookmarks, recent list, and HTML escaping.
 
 ## Important status
 This is a **working local prototype / integration foundation**, not a production-ready POS. It does not yet implement secure Google OAuth, automatic Google Drive/Sheets/Apps Script provisioning, production authentication, Mwakete API integration, refunds, staff permissions, multi-outlet inventory, digital-payment verification, or a complete server-authoritative stock ledger. Do not use it for live business transactions until those items are implemented and independently tested.

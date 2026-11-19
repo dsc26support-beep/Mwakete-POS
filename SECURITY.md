@@ -14,4 +14,11 @@ Before production:
 9. Minimise local customer data and provide device logout / local-data clearing controls.
 10. Keep secrets in platform secret stores; never commit them to Git.
 
+## Guides & Links (Help tab)
+- Official guides are bundled with the app, not fetched at runtime, so no remote content can be injected into them. Remote publishing must not be added without authenticated admin roles and server-side validation.
+- Business links and notes are untrusted input: every value is HTML-escaped on render, and links are re-validated at render time (https only, no credentials, no localhost/IP/intranet hosts, no `javascript:` / `data:`).
+- External links use `rel="noopener noreferrer"` and show a confirmation naming the destination domain.
+- Business notes are stored unencrypted in the browser on that device and are visible to anyone with access to the browser profile. Users are warned not to store passwords, tokens or keys there.
+- Any local user can currently add/remove business links; there are no owner/cashier roles until the authenticated backend exists.
+
 Report vulnerabilities privately to the repository owner. Do not publish exploit details before a fix is available.

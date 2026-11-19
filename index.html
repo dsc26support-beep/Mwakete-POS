@@ -25,6 +25,7 @@
       <button class="tab" data-view="products">Products</button>
       <button class="tab" data-view="sales">Sales history</button>
       <button class="tab" data-view="setup">Business setup</button>
+      <button class="tab" data-view="help">Help &amp; guides</button>
     </nav>
     <section id="view-sale" class="view">
       <div class="workspace">
@@ -74,6 +75,30 @@
         <div class="notice"><strong>Mwakete Marketplace connection</strong><p>The Mwakete adapter is a documented integration boundary. It must be connected to verified existing Mwakete authentication and APIs before marketplace accounts or live inventory are enabled.</p></div>
       </div>
     </section>
+    <section id="view-help" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">HELP &amp; BUSINESS RESOURCES</p><h2>Guides &amp; links</h2></div><input id="helpSearch" class="search" type="search" placeholder="Search guides, tutorials and answers…" autocomplete="off" aria-label="Search guides"></div>
+        <p class="hint">Official guides are built into the app and work offline.</p>
+        <div id="helpCategories" class="chips"></div>
+        <div id="helpList"></div>
+      </div>
+      <div class="panel">
+        <p class="eyebrow">USEFUL LINKS</p><h2>Official links</h2><p class="hint">These open another website. Mwakete POS will ask before you leave.</p>
+        <div id="officialLinks"></div>
+      </div>
+      <div class="panel">
+        <p class="eyebrow">YOUR BUSINESS</p><h2>Your links &amp; staff notes</h2>
+        <p class="hint">Managed by you. Saved on <strong>this device only</strong> — not shared with other devices or staff yet, and not encrypted. Do not store passwords or keys here.</p>
+        <form id="resourceForm" class="settings-form">
+          <label>Type<select name="kind"><option value="link">Link (supplier, delivery, accounting…)</option><option value="note">Staff training note</option></select></label>
+          <label>Title<input name="title" maxlength="80" required placeholder="e.g. Main supplier"></label>
+          <label id="resourceUrlLabel">Web address (https://…)<input name="url" type="url" required placeholder="https://example.com"></label>
+          <label>Note (optional)<input name="note" maxlength="500" placeholder="Short description"></label>
+          <button class="button primary" type="submit">Save</button>
+        </form>
+        <div id="businessResources"></div>
+      </div>
+    </section>
     <footer>© <span id="year"></span> Mwakete POS · Built for businesses in Kiribati</footer>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -81,6 +106,8 @@
   <script src="./js/integrations/google.js"></script>
   <script src="./js/integrations/mwakete.js"></script>
   <script src="./js/sync.js"></script>
+  <script src="./js/guides.js"></script>
+  <script src="./js/help.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>
