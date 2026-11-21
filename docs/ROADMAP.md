@@ -18,6 +18,12 @@
 - Explicit pending / syncing / synced / failed states.
 - Never discard unconfirmed transactions.
 
+## Business tiers (Counter / Retail / Wholesale)
+- **Counter** (done): the original app; default tier.
+- **Retail** (done, local-only): barcode Enter-to-add, reorder levels, categories, discounts, receipts, customers, reports. Still needed for production: camera scanning, printer support, server-authoritative stock and pricing, customer sync under the retailer's own Google/Mwakete tenant, device-level data protection.
+- **Wholesale** (next phase, not started): price tiers per customer group; bulk units (case/carton ↔ unit, minimum order quantity); trade customer accounts with invoice numbers and credit balances; purchase orders / supplier restock; quotes and delivery notes. Credit balances and invoices are financial records and are a **production blocker until the server-authoritative ledger exists**; any interim version must be local-only and labelled "not an official ledger".
+- Tier is a UI setting; entitlement/permission enforcement belongs in the authenticated backend.
+
 ## Gate 4 — Inventory and reporting
 - Independent business stock ledger.
 - Mwakete marketplace inventory adapter using existing APIs.

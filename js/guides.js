@@ -79,6 +79,69 @@ const GuidesCore = (() => {
       ],
     },
     {
+      id: "g-tiers",
+      category: "start",
+      title: "Choose your business type",
+      subtitle: "Counter or Retail — and how to switch",
+      description:
+        "Counter for restaurants and micro-sellers; Retail for shops. Wholesale is coming soon.",
+      steps: [
+        "Open Business setup and look at Business type.",
+        "Counter is the simple POS: a short product list and fast cash sales. It is the default.",
+        "Retail adds barcode scanning, low-stock alerts, discounts, receipts, customers and reports.",
+        "Wholesale (price tiers, invoices, purchase orders) is coming soon and cannot be selected yet.",
+        "You can switch any time. Your products, sales and customers are kept. Switching to Counter only hides the Retail screens.",
+        "Business type is a setting on this device. It does not change what the server allows.",
+      ],
+    },
+    {
+      id: "g-barcode",
+      category: "inventory",
+      title: "Scan barcodes and get low-stock alerts",
+      subtitle: "Retail: add products fast and know when to reorder",
+      description:
+        "Barcode scanner, SKU, reorder level, category, low stock list.",
+      steps: [
+        "Switch to Retail in Business setup.",
+        "When you add a product, enter its Barcode / SKU. You can also add a Category and a Reorder level.",
+        "On Quick sale, click the search box and scan with a USB or Bluetooth scanner that types like a keyboard. The scanner sends Enter and the product is added.",
+        "The barcode must match the product's Barcode / SKU exactly. If nothing matches, you will see a message and nothing is added.",
+        "Products Low stock lists items at or below their reorder level. Stock counts are kept on this device.",
+        "Scanning with the phone camera is not available yet.",
+      ],
+    },
+    {
+      id: "g-discounts-receipts",
+      category: "sales",
+      popular: true,
+      title: "Give a discount and print a receipt",
+      subtitle: "Retail: percent or fixed discounts, receipts",
+      description:
+        "Discount on a sale, receipt, print, copy, customer on a sale.",
+      steps: [
+        "Add products to the cart on Quick sale.",
+        "Under Discount, choose Percent or Fixed amount and type the value. The new total is shown. A discount cannot be more than the sale total.",
+        "Optionally choose a Customer.",
+        "Complete the sale. A receipt opens: use Print or Copy, then Close.",
+        "To see an old receipt, open Sales history and click the sale.",
+        "Receipts for Other payments say the payment is recorded but not verified.",
+      ],
+    },
+    {
+      id: "g-customers-reports",
+      category: "sales",
+      title: "Customers and reports",
+      subtitle: "Retail: keep a customer list and see your sales",
+      description:
+        "Customers tab, sales by day, category, top products, stock value.",
+      steps: [
+        "Open Customers and add a name. Phone and note are optional.",
+        "Customers are saved on this device only. Names and phone numbers are not synchronised. Only an anonymous ID is attached to a sale.",
+        "Open Reports to see sales by day, by category, top products and stock value.",
+        "Reports are worked out from sales saved on this device. They are not the cloud ledger and may differ from your Google backend.",
+      ],
+    },
+    {
       id: "g-setup",
       category: "start",
       title: "Set up your business",
