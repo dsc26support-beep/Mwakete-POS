@@ -50,20 +50,26 @@ test("Counter has no Retail features; Retail has all of them", () => {
   assert.equal(T.has("nonsense", "reports"), false);
 });
 
-test("Wholesale includes every Retail feature plus only the features PR 1 ships", () => {
+test("Wholesale includes every Retail feature plus only the features shipped so far (PR 1-2)", () => {
   assert.equal(T.TIERS.wholesale.available, true);
   assert.ok(
     T.TIERS.retail.features.every((f) =>
       T.TIERS.wholesale.features.includes(f),
     ),
   );
-  for (const f of ["priceTiers", "bulkUnits", "tradeCustomers", "tax"]) {
+  for (const f of [
+    "priceTiers",
+    "bulkUnits",
+    "tradeCustomers",
+    "tax",
+    "invoices",
+  ]) {
     assert.equal(T.has("wholesale", f), true, f);
     assert.equal(T.has("retail", f), false, f);
     assert.equal(T.has("counter", f), false, f);
   }
   // Later Wholesale PRs: still off, so nothing half-built is visible.
-  for (const f of ["invoices", "purchaseOrders", "quotes"])
+  for (const f of ["purchaseOrders", "quotes"])
     assert.equal(T.has("wholesale", f), false, f);
   assert.equal(T.canChange("counter", "wholesale").ok, true);
 });

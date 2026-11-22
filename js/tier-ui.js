@@ -28,6 +28,7 @@ const TierUI = (() => {
     renderChoices();
     if (window.WholesaleUI) await WholesaleUI.render();
     if (window.RetailUI) await RetailUI.render();
+    if (window.InvoiceUI) await InvoiceUI.render();
   }
 
   async function choose(id) {

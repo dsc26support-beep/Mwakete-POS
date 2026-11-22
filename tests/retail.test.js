@@ -300,6 +300,29 @@ test("sales report aggregates by day, category and product", () => {
   });
   assert.equal(r.stockValue, 25);
 });
+test("sales report excludes tax on Wholesale invoices (total is gross, tax is subtracted)", () => {
+  const d = new Date(2026, 10, 22, 10).getTime();
+  const sales = [
+    {
+      createdAt: d,
+      total: 225,
+      tax: 25,
+      items: [{ productId: "p1", name: "Rice", unitPrice: 100, quantity: 2 }],
+    },
+    {
+      createdAt: d,
+      total: 10,
+      items: [{ productId: "p1", name: "Rice", unitPrice: 10, quantity: 1 }],
+    },
+  ];
+  const r = R.salesReport(sales, []);
+  assert.equal(r.total, 210);
+  assert.deepEqual(
+    r.byDay.map((x) => x.total),
+    [210],
+  );
+  assert.match(R.reportHtml(r, "AUD"), /Totals exclude tax/);
+});
 test("sales report handles no data", () => {
   const r = R.salesReport([], []);
   assert.deepEqual(

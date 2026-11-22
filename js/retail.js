@@ -242,7 +242,8 @@ const RetailCore = (() => {
       tops = new Map();
     let totalMinor = 0;
     for (const s of sales || []) {
-      const tMinor = toMinor(s.total);
+      // Reports exclude tax (Wholesale invoices store sale.tax; sale.total is the gross amount owed).
+      const tMinor = toMinor(s.total) - toMinor(s.tax || 0);
       totalMinor += tMinor;
       const k = dayKey(s.createdAt);
       const d = days.get(k) || { day: k, count: 0, totalMinor: 0 };
@@ -308,7 +309,7 @@ const RetailCore = (() => {
   function reportHtml(r, currency) {
     const cur = esc(currency || "");
     return (
-      `<p class="hint">Calculated from sales saved on <strong>this device</strong>. This is not the cloud ledger.</p>` +
+      `<p class="hint">Calculated from sales saved on <strong>this device</strong>. This is not the cloud ledger. Totals exclude tax.</p>` +
       `<div class="stat-row"><div><small>Sales</small><strong>${esc(r.salesCount)}</strong></div><div><small>Total ${cur}</small><strong>${money(r.total)}</strong></div><div><small>Stock value ${cur}</small><strong>${money(r.stockValue)}</strong></div></div>` +
       `<h3>By day</h3>` +
       table(

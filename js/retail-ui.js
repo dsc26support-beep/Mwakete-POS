@@ -59,6 +59,7 @@ const RetailUI = (() => {
       cur?.value || "",
     );
     afterCart(lastCart);
+    if (window.InvoiceUI) InvoiceUI.render();
   }
 
   // Called by renderCart(): show the discounted total without changing the cart itself.
@@ -104,6 +105,9 @@ const RetailUI = (() => {
       cart[i] && cart[i].category ? { ...it, category: cart[i].category } : it,
     );
     if (window.WholesaleUI) WholesaleUI.decorateSale(sale, cart);
+    // Wholesale invoices: tax, number and on-account handling. false = the sale was cancelled (message already shown).
+    if (window.InvoiceUI && !(await InvoiceUI.decorateSale(sale, cart)))
+      return false;
     return true;
   }
 
@@ -120,7 +124,10 @@ const RetailUI = (() => {
       POSDB.get("settings", "businessName"),
       sale.customerId ? POSDB.get("customers", sale.customerId) : null,
     ]);
-    lastReceipt = R.buildReceiptText(sale, name?.value || "Mwakete POS", cust);
+    lastReceipt =
+      sale.invoice && window.InvoiceUI
+        ? await InvoiceUI.textFor(sale)
+        : R.buildReceiptText(sale, name?.value || "Mwakete POS", cust);
     $("receiptBody").innerHTML = R.receiptHtml(lastReceipt);
     $("receiptPanel").classList.remove("hidden");
     $("receiptClose").focus();

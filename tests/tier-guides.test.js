@@ -31,11 +31,18 @@ test("tier and Retail guides exist and are findable by search", () => {
 });
 
 test("guides are honest: Wholesale is coming soon, camera scanning is unavailable, data is device-only", () => {
+  assert.match(text("g-tiers"), /credit ledger is NOT production-ready/);
+  assert.match(text("g-tiers"), /Purchase orders and quotes are coming soon/);
+  assert.match(text("g-invoices"), /12\.5%/);
   assert.match(
-    text("g-tiers"),
-    /invoices, credit accounts, purchase orders and quotes are coming soon/i,
+    text("g-invoices"),
+    /Payments are not matched to individual invoices/,
   );
-  assert.match(text("g-price-lists"), /credit accounts are not active yet/);
+  assert.match(text("g-invoices"), /can still continue/);
+  assert.match(text("g-ledger"), /NOT production-ready/);
+  assert.match(text("g-ledger"), /LEDGER_ENABLED/);
+  assert.match(text("g-ledger"), /Ledger not enabled/);
+  assert.ok(!/credit accounts are not active yet/.test(text("g-price-lists")));
   assert.match(text("g-price-lists"), /this device only/);
   assert.match(text("g-pack-sizes"), /72 single units/);
   assert.match(text("g-tiers"), /kept/);

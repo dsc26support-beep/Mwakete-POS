@@ -426,9 +426,11 @@ const eq = (a, b, m) => {
     sale.syncStatus === "pending",
     "sale stays pending until the server confirms",
   );
+  // PR 2: a tax invoice needs the customer's name, so it is kept ONLY as a snapshot inside sale.invoice.
   ok(
-    !JSON.stringify(sale).includes("Moote"),
-    "customer name is not stored on the sale",
+    sale.invoice.customerName === "Moote Trading" &&
+      !JSON.stringify({ ...sale, invoice: undefined }).includes("Moote"),
+    "customer name appears only in the invoice snapshot, nowhere else on the sale",
   );
   eq(
     await page.inputValue("#salePriceList"),
@@ -450,8 +452,12 @@ const eq = (a, b, m) => {
     (x) => x.tier === "wholesale" && x.items[0].productId === "r-p",
   );
   ok(
-    plain && plain.total === 3 && plain.items[0].packId === undefined,
-    "plain product sold at base price, no pack fields",
+    plain &&
+      plain.subtotal === 3 &&
+      plain.tax === 0.38 &&
+      plain.total === 3.38 &&
+      plain.items[0].packId === undefined,
+    "plain product sold at base price + 12.5% tax (0.375 rounds half up to 0.38), no pack fields",
   );
 
   console.log("Retail after Wholesale: unchanged behaviour, data kept");

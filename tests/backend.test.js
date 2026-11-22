@@ -1,59 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
+const { load } = require("./helpers/gas.js");
 
-// Loads the real Apps Script file with minimal stubs for Google services.
-function load(existingRows) {
-  const rows = existingRows ? existingRows.map((r) => [...r]) : [];
-  const sheet = {
-    getLastRow: () => rows.length,
-    getLastColumn: () => (rows[0] ? rows[0].length : 0),
-    appendRow: (r) => rows.push(r),
-    getRange: (row, col, nr, nc) => ({
-      getValues: () =>
-        rows
-          .slice(row - 1, row - 1 + nr)
-          .map((r) => r.slice(col - 1, col - 1 + nc)),
-      setValues: (v) => {
-        rows[0] = v[0];
-      },
-    }),
-  };
-  let created = existingRows ? sheet : null;
-  const ctx = {
-    SpreadsheetApp: {
-      openById: () => ({
-        getSheetByName: () => created,
-        insertSheet: () => (created = sheet),
-      }),
-    },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
-    ContentService: {
-      createTextOutput: (s) => ({
-        s,
-        setMimeType() {
-          return this;
-        },
-      }),
-      MimeType: { JSON: "json" },
-    },
-  };
-  vm.createContext(ctx);
-  vm.runInContext(
-    fs.readFileSync(
-      path.join(__dirname, "../google-apps-script/Code.gs"),
-      "utf8",
-    ),
-    ctx,
-  );
-  const post = (payload) =>
-    JSON.parse(
-      ctx.doPost({ postData: { contents: JSON.stringify(payload) } }).s,
-    );
-  return { ctx, rows, post };
-}
 const sale = (over = {}) => ({
   id: "s1",
   createdAt: 1000,
@@ -63,23 +11,45 @@ const sale = (over = {}) => ({
   items: [{ productId: "p", name: "Water", unitPrice: 2.5, quantity: 2 }],
   ...over,
 });
-const sync = (transactions) => ({
+const sync = (transactions, extra = {}) => ({
   type: "pos_sync",
-  schemaVersion: 1,
+  schemaVersion: 2,
   transactions,
+  ...extra,
 });
+const SALES_COLS = 12;
 
 test("a plain Counter sale (no new fields) is accepted exactly as before", () => {
   const { post, rows } = load();
   const r = post(sync([sale()]));
-  assert.deepEqual(r, { ok: true, acceptedIds: ["s1"] });
-  assert.equal(rows.length, 2);
-  assert.equal(rows[1][3], 5);
-  assert.equal(rows[1][6], 0);
-  assert.equal(rows[1][8], "counter");
+  assert.deepEqual(r.acceptedIds, ["s1"]);
+  assert.deepEqual(r.rejected, []);
+  assert.equal(r.ok, true);
+  assert.equal(rows("Sales").length, 2);
+  assert.equal(rows("Sales")[1][3], 5);
+  assert.equal(rows("Sales")[1][6], 0);
+  assert.equal(rows("Sales")[1][8], "counter");
+  assert.deepEqual(
+    [rows("Sales")[1][9], rows("Sales")[1][10], rows("Sales")[1][11]],
+    [0, "", ""],
+  );
+  assert.equal(
+    rows("Invoices"),
+    null,
+    "no ledger sheets are created for non-invoice sales",
+  );
 });
 
-test("a Retail sale with a discount is accepted and its new columns are stored", () => {
+test("an old v1 request (schemaVersion 1, no payments/customers) still works", () => {
+  const { post } = load();
+  assert.deepEqual(
+    post({ type: "pos_sync", schemaVersion: 1, transactions: [sale()] })
+      .acceptedIds,
+    ["s1"],
+  );
+});
+
+test("a Retail sale with a discount is accepted and its columns are stored", () => {
   const { post, rows } = load();
   const r = post(
     sync([
@@ -94,10 +64,10 @@ test("a Retail sale with a discount is accepted and its new columns are stored",
     ]),
   );
   assert.deepEqual(r.acceptedIds, ["r1"]);
-  assert.deepEqual(Array.from(rows[1].slice(6)), [0.5, "c-1", "retail"]);
+  assert.deepEqual(rows("Sales")[1].slice(6, 9), [0.5, "c-1", "retail"]);
 });
 
-test("a Wholesale pack sale is validated by arithmetic and stored with its tier", () => {
+test("a Wholesale pack sale (no invoice) is validated by arithmetic and stored with its tier", () => {
   const { post, rows } = load();
   const items = [
     { productId: "p", name: "Rice", unitPrice: 8.5, quantity: 1 },
@@ -110,63 +80,75 @@ test("a Wholesale pack sale is validated by arithmetic and stored with its tier"
       packUnits: 24,
     },
   ];
-  const r = post(
-    sync([
-      sale({
-        id: "w1",
-        total: 416.5,
-        tier: "wholesale",
-        priceListId: "trade",
-        customerId: "c-9",
-        items,
-      }),
-    ]),
+  assert.deepEqual(
+    post(
+      sync([
+        sale({
+          id: "w1",
+          total: 416.5,
+          tier: "wholesale",
+          priceListId: "trade",
+          customerId: "c-9",
+          items,
+        }),
+      ]),
+    ).acceptedIds,
+    ["w1"],
   );
-  assert.deepEqual(r.acceptedIds, ["w1"]);
-  assert.equal(rows[1][8], "wholesale");
-  assert.equal(
-    post(sync([sale({ id: "w2", total: 416, tier: "wholesale", items })])).ok,
-    false,
+  assert.equal(rows("Sales")[1][8], "wholesale");
+  const bad = post(
+    sync([sale({ id: "w2", total: 416, tier: "wholesale", items })]),
   );
+  assert.deepEqual(bad.acceptedIds, []);
+  assert.match(bad.rejected[0].reason, /does not match/);
 });
 
 test("floating-point sums are tolerated (0.1 x 3)", () => {
   const { post } = load();
-  const r = post(
-    sync([
-      sale({
-        id: "f1",
-        total: 0.30000000000000004,
-        items: [{ unitPrice: 0.1, quantity: 3 }],
-      }),
-    ]),
+  assert.deepEqual(
+    post(
+      sync([
+        sale({
+          id: "f1",
+          total: 0.30000000000000004,
+          items: [{ unitPrice: 0.1, quantity: 3 }],
+        }),
+      ]),
+    ).acceptedIds,
+    ["f1"],
   );
-  assert.equal(r.ok, true);
 });
 
-test("a total that does not match the items and discount is rejected", () => {
+test("a total that does not match the items and discount is REJECTED and nothing is stored", () => {
   for (const bad of [
-    sale({ total: 4 }), // understated
-    sale({ total: 6 }), // overstated
-    sale({ total: 5, discount: { amount: 0.5 } }), // discount not applied
-    sale({ total: 4.5, discount: { amount: 0.4 } }), // discount mismatch
+    sale({ total: 4 }),
+    sale({ total: 6 }),
+    sale({ total: 5, discount: { amount: 0.5 } }),
+    sale({ total: 4.5, discount: { amount: 0.4 } }),
   ]) {
     const { post, rows } = load();
     const r = post(sync([bad]));
-    assert.equal(r.ok, false);
-    assert.match(r.error, /does not match/);
-    assert.equal(rows.length, 1, "nothing but the header may be stored");
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.acceptedIds, []);
+    assert.deepEqual(
+      r.rejected.map((x) => [x.id, x.kind]),
+      [["s1", "sale"]],
+    );
+    assert.match(r.rejected[0].reason, /does not match/);
+    assert.equal(rows("Sales").length, 1, "only the header may exist");
   }
 });
 
 test("excessive, negative or malformed discounts are rejected", () => {
   for (const discount of [{ amount: 6 }, { amount: -1 }, { amount: "abc" }]) {
     const { post } = load();
-    assert.equal(post(sync([sale({ total: 0, discount })])).ok, false);
+    const r = post(sync([sale({ total: 0, discount })]));
+    assert.deepEqual(r.acceptedIds, []);
+    assert.equal(r.rejected.length, 1);
   }
 });
 
-test("malformed transactions and line items are rejected", () => {
+test("malformed transactions and line items are rejected per record", () => {
   for (const bad of [
     null,
     sale({ id: "" }),
@@ -180,19 +162,47 @@ test("malformed transactions and line items are rejected", () => {
     sale({ total: NaN }),
   ]) {
     const { post } = load();
-    assert.equal(post(sync([bad])).ok, false, JSON.stringify(bad));
+    const r = post(sync([bad]));
+    assert.equal(r.ok, true, JSON.stringify(bad));
+    assert.deepEqual(r.acceptedIds, [], JSON.stringify(bad));
+    assert.equal(r.rejected.length, 1, JSON.stringify(bad));
   }
+});
+
+test("ONE BAD RECORD DOES NOT BLOCK THE OTHERS (previously it failed the whole batch)", () => {
+  const { post, rows } = load();
+  const r = post(
+    sync([
+      sale({ id: "good1" }),
+      sale({ id: "bad", total: 99 }),
+      sale({ id: "good2" }),
+    ]),
+  );
+  assert.deepEqual(r.acceptedIds, ["good1", "good2"]);
+  assert.deepEqual(
+    r.rejected.map((x) => x.id),
+    ["bad"],
+  );
+  assert.equal(rows("Sales").length, 3);
+});
+
+test("tax is only allowed on invoices (a Retail sale cannot smuggle tax in)", () => {
+  const { post } = load();
+  const r = post(sync([sale({ total: 5.5, tax: 0.5 })]));
+  assert.deepEqual(r.acceptedIds, []);
+  assert.match(r.rejected[0].reason, /Tax is only allowed on invoices/);
+  assert.deepEqual(post(sync([sale({ id: "z", tax: 0 })])).acceptedIds, ["z"]);
 });
 
 test("re-sending the same sale is idempotent: confirmed again, stored once", () => {
   const { post, rows } = load();
   assert.deepEqual(post(sync([sale()])).acceptedIds, ["s1"]);
   assert.deepEqual(post(sync([sale()])).acceptedIds, ["s1"]);
-  assert.equal(rows.length, 2);
+  assert.equal(rows("Sales").length, 2);
 });
 
-test("an existing sheet with the old 6-column header is upgraded without losing rows", () => {
-  const old = [
+test("an existing sheet with an old header is upgraded without losing rows", () => {
+  const old6 = [
     [
       "Transaction ID",
       "Created At",
@@ -203,14 +213,59 @@ test("an existing sheet with the old 6-column header is upgraded without losing 
     ],
     ["old1", 1, "AUD", 5, "cash", "[]"],
   ];
-  const { post, rows } = load(old);
-  assert.equal(post(sync([sale({ id: "new1" })])).ok, true);
-  assert.equal(rows.length, 3);
-  assert.equal(rows[0].length, 9);
-  assert.equal(rows[1][0], "old1");
+  const a = load({ sheets: { Sales: old6 } });
+  assert.equal(a.post(sync([sale({ id: "new1" })])).ok, true);
+  assert.equal(a.rows("Sales").length, 3);
+  assert.equal(a.rows("Sales")[0].length, SALES_COLS);
+  assert.equal(a.rows("Sales")[1][0], "old1");
+  const old9 = [
+    [
+      "Transaction ID",
+      "Created At",
+      "Currency",
+      "Total",
+      "Payment Method",
+      "Items JSON",
+      "Discount",
+      "Customer ID",
+      "Tier",
+    ],
+    ["old2", 1, "AUD", 5, "cash", "[]", 0, "", "retail"],
+  ];
+  const b = load({ sheets: { Sales: old9 } });
+  assert.deepEqual(b.post(sync([sale({ id: "new2" })])).acceptedIds, ["new2"]);
+  assert.equal(b.rows("Sales")[0].length, SALES_COLS);
+  assert.equal(b.rows("Sales")[1][8], "retail");
 });
 
-test("unsupported request types are rejected", () => {
+test("whole-request problems still fail the request: bad type, bad JSON, oversize batch or body", () => {
   const { post } = load();
   assert.equal(post({ type: "other" }).ok, false);
+  assert.equal(post("not json").ok, false);
+  assert.equal(
+    post(sync(Array.from({ length: 101 }, (_, i) => sale({ id: "x" + i })))).ok,
+    false,
+  );
+  assert.equal(post(sync("nope")).ok, false);
+  assert.equal(
+    post(sync([], { payments: Array.from({ length: 101 }, () => ({})) })).ok,
+    false,
+  );
+  assert.equal(post("x".repeat(1000001)).ok, false);
+});
+
+test("doGet reports the schema version and whether the ledger is enabled", () => {
+  assert.deepEqual(
+    [load().get().schemaVersion, load().get().ledgerEnabled],
+    [2, false],
+  );
+  assert.equal(
+    load({ props: { LEDGER_ENABLED: "true" } }).get().ledgerEnabled,
+    true,
+  );
+  assert.equal(
+    load({ props: { LEDGER_ENABLED: "yes" } }).get().ledgerEnabled,
+    false,
+    "only the exact string true enables it",
+  );
 });
