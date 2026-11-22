@@ -13,8 +13,14 @@ const TierCore = (() => {
     "reports",
     "lowStock",
   ];
-  // Each Wholesale PR turns on only what it ships. Declared-but-off (PR 2-4): invoices, purchaseOrders, quotes.
-  const WHOLESALE_ONLY = ["priceTiers", "bulkUnits", "tradeCustomers", "tax"];
+  // Each Wholesale PR turns on only what it ships. Declared-but-off (PR 3-4): purchaseOrders, quotes.
+  const WHOLESALE_ONLY = [
+    "priceTiers",
+    "bulkUnits",
+    "tradeCustomers",
+    "tax",
+    "invoices",
+  ];
   const TIERS = {
     counter: {
       id: "counter",
@@ -38,7 +44,7 @@ const TierCore = (() => {
       available: true,
       features: [...RETAIL, ...WHOLESALE_ONLY],
       blurb:
-        "Trade sellers: everything in Retail plus price lists, pack sizes (cartons) and trade customers. Invoices and purchase orders are coming soon.",
+        "Trade sellers: everything in Retail plus price lists, pack sizes (cartons), trade customers, and tax invoices with credit accounts (ledger not production-ready yet). Purchase orders and quotes are coming soon.",
     },
   };
   const DEFAULT_TIER = "counter";

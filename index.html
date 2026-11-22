@@ -26,6 +26,7 @@
       <button class="tab" data-view="sales">Sales history</button>
       <button class="tab hidden" data-view="customers" data-feature="customers">Customers</button>
       <button class="tab hidden" data-view="pricelists" data-feature="priceTiers">Price lists</button>
+      <button class="tab hidden" data-view="accounts" data-feature="invoices">Accounts</button>
       <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
       <button class="tab" data-view="setup">Business setup</button>
       <button class="tab" data-view="help">Help &amp; guides</button>
@@ -123,6 +124,32 @@
         <div id="priceListList"></div>
       </div>
     </section>
+    <section id="view-accounts" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">WHOLESALE</p><h2>Accounts and invoices</h2></div></div>
+        <div class="notice warn"><strong>Credit ledger: not production-ready</strong><p>Your Apps Script has no verified sign-in yet. Do not use the ledger with real customer or payment data until authenticated Google sign-in is available. The ledger stays off until you set <code>LEDGER_ENABLED=true</code> in your Apps Script project properties.</p></div>
+        <div id="rejectedBox" class="notice hidden"><strong><span id="rejectedCount">0</span> record(s) rejected by your ledger</strong><p>They are kept on this device and are not synchronised. The reason is shown on each record. Fix the cause (for example, turn the ledger on), then retry.</p><button class="button secondary" type="button" data-retry-rejected>Retry rejected records</button></div>
+        <h3>Customer balances</h3>
+        <p class="hint">Balance = invoices on account minus payments received. <strong>Confirmed</strong> is the last balance your ledger returned; <strong>pending</strong> is what this device has recorded since. Both can be out of date while offline.</p>
+        <div id="accountList"></div>
+      </div>
+      <div class="panel">
+        <p class="eyebrow">PAYMENTS</p><h2>Record a payment received</h2>
+        <p class="hint">Cash received against a trade customer's account. It reduces their balance. Not confirmed until you sync.</p>
+        <form id="paymentForm" class="settings-form">
+          <label>Customer<select name="paymentCustomer" id="paymentCustomer" required><option value="">Choose customer…</option></select></label>
+          <label>Amount received<input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"></label>
+          <label>Note (optional)<input name="note" maxlength="200" placeholder="e.g. part payment"></label>
+          <button class="button primary" type="submit">Save payment</button>
+        </form>
+        <div id="paymentList"></div>
+      </div>
+      <div class="panel">
+        <p class="eyebrow">INVOICES</p><h2>Recent invoices</h2>
+        <p class="hint">Tap an invoice to open it. Print or copy it from there.</p>
+        <div id="invoiceList"></div>
+      </div>
+    </section>
     <section id="view-reports" class="view hidden">
       <div class="panel">
         <div class="section-heading"><div><p class="eyebrow">RETAIL</p><h2>Reports</h2></div></div>
@@ -205,11 +232,13 @@
   <script src="./js/db.js"></script>
   <script src="./js/integrations/google.js"></script>
   <script src="./js/integrations/mwakete.js"></script>
+  <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
   <script src="./js/retail.js"></script>
   <script src="./js/wholesale.js"></script>
   <script src="./js/wholesale-ui.js"></script>
+  <script src="./js/invoices-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
