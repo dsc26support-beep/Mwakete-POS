@@ -29,5 +29,7 @@ Before production:
 - Reports and stock counts are local approximations, not an authoritative ledger.
 - Receipts label non-cash payments "recorded, NOT verified". The app still does not verify digital payments.
 - Wholesale credit balances and invoices (planned) are financial records and **must not ship as local-only data** in production; they need the server-authoritative ledger.
+- Wholesale part 1 (price lists, pack sizes, trade customers) is **local-only and unencrypted** on the device. Trade customer details (name, phone, credit limit, terms, tax number) do not leave the device; a sale carries only an opaque `customerId` and `priceListId`. A credit limit is a note, not a control. Prices are chosen client-side, so the server can validate only arithmetic until a server-side catalogue exists. Tax settings are stored but not applied to any sale until invoices (PR 2).
+- When invoices and the credit ledger arrive (PR 2), invoice customer names and trade details will be written to the business's own Google Sheet. The Apps Script has no verified sign-in, so that ledger **must not be used with real customer or payment data** until authenticated Google sign-in and owner-authorised provisioning exist.
 
 Report vulnerabilities privately to the repository owner. Do not publish exploit details before a fix is available.

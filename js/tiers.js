@@ -13,13 +13,8 @@ const TierCore = (() => {
     "reports",
     "lowStock",
   ];
-  const WHOLESALE_ONLY = [
-    "priceTiers",
-    "bulkUnits",
-    "invoices",
-    "purchaseOrders",
-    "quotes",
-  ];
+  // Each Wholesale PR turns on only what it ships. Declared-but-off (PR 2-4): invoices, purchaseOrders, quotes.
+  const WHOLESALE_ONLY = ["priceTiers", "bulkUnits", "tradeCustomers", "tax"];
   const TIERS = {
     counter: {
       id: "counter",
@@ -40,10 +35,10 @@ const TierCore = (() => {
     wholesale: {
       id: "wholesale",
       title: "Wholesale",
-      available: false,
+      available: true,
       features: [...RETAIL, ...WHOLESALE_ONLY],
       blurb:
-        "Trade sellers: price tiers, bulk units, invoices and purchase orders. Coming soon.",
+        "Trade sellers: everything in Retail plus price lists, pack sizes (cartons) and trade customers. Invoices and purchase orders are coming soon.",
     },
   };
   const DEFAULT_TIER = "counter";
@@ -74,7 +69,11 @@ const TierCore = (() => {
     return lost.length
       ? "Switching to " +
           TIERS[to].title +
-          " hides Retail screens (customers, reports, discounts). Your data is kept and comes back if you switch again."
+          " hides screens it does not include (" +
+          (normalize(from) === "wholesale" && to === "retail"
+            ? "price lists, pack sizes, trade customers"
+            : "customers, reports, discounts, price lists") +
+          "). Your data is kept and comes back if you switch again."
       : "";
   }
   async function setTier(store, to) {

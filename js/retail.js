@@ -296,8 +296,9 @@ const RetailCore = (() => {
       )
       .join("");
   }
-  function customerRow(c) {
-    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div>`;
+  // `extraHtml` is pre-escaped HTML from a trusted builder (e.g. the Wholesale trade badge).
+  function customerRow(c, extraHtml = "") {
+    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div>`;
   }
   function table(head, rows) {
     return rows.length

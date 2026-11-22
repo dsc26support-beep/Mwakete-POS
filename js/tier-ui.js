@@ -26,6 +26,7 @@ const TierUI = (() => {
     if (active && active.classList.contains("hidden"))
       document.querySelector('.tab[data-view="sale"]').click();
     renderChoices();
+    if (window.WholesaleUI) await WholesaleUI.render();
     if (window.RetailUI) await RetailUI.render();
   }
 

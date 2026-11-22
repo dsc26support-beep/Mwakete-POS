@@ -1,5 +1,5 @@
-const CACHE="mwakete-pos-shell-v6";
-const FILES=["./","./index.html","./manifest.webmanifest","./css/app.css","./js/db.js","./js/app.js","./js/sync.js","./js/tiers.js","./js/retail.js","./js/tier-ui.js","./js/retail-ui.js","./js/guides.js","./js/help.js","./js/integrations/google.js","./js/integrations/mwakete.js","./assets/icon.svg"];
+const CACHE="mwakete-pos-shell-v7";
+const FILES=["./","./index.html","./manifest.webmanifest","./css/app.css","./js/db.js","./js/app.js","./js/sync.js","./js/wholesale.js","./js/wholesale-ui.js","./js/tiers.js","./js/retail.js","./js/tier-ui.js","./js/retail-ui.js","./js/guides.js","./js/help.js","./js/integrations/google.js","./js/integrations/mwakete.js","./assets/icon.svg"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(response=>{if(response.ok&&new URL(e.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(c=>c.put(e.request,copy))}return response}).catch(()=>cached||caches.match("./index.html"))))});

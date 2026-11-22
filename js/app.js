@@ -15,6 +15,7 @@ function renderProducts(){
  const q=$("productSearch").value.toLowerCase().trim(),items=products.filter(p=>(p.name+" "+(p.sku||"")).toLowerCase().includes(q));
  $("productGrid").innerHTML=items.map(p=>`<button class="product-card" data-add="${p.id}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock} in stock</small></button>`).join("");
  $("emptyProducts").classList.toggle("hidden",products.length>0);
+ if(window.WholesaleUI)WholesaleUI.afterProducts();
 }
 function renderCart(){
  $("cartCount").textContent=cart.reduce((n,x)=>n+x.qty,0);
@@ -26,7 +27,7 @@ function renderProductTable(){$("productTable").innerHTML=products.length?`<tabl
 async function renderSales(){const sales=(await POSDB.all("sales")).sort((a,b)=>b.createdAt-a.createdAt);$("salesList").innerHTML=sales.length?sales.map(s=>`<div class="sale-row" data-sale-id="${esc(s.id)}"><div><strong>${esc(s.id.slice(0,18))}</strong><small>${new Date(s.createdAt).toLocaleString()} · ${s.paymentMethod} · ${s.syncStatus}</small></div><strong>${money(s.total)}</strong></div>`).join(""):'<p class="empty">No sales recorded yet.</p>'}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 document.addEventListener("click",async e=>{
- const add=e.target.closest("[data-add]");if(add){const p=products.find(x=>x.id===add.dataset.add);if(p){const line=cart.find(x=>x.id===p.id);if(line)line.qty++;else cart.push({...p,qty:1});renderCart()}return}
+ const add=e.target.closest("[data-add]");if(add){const p=products.find(x=>x.id===add.dataset.add);if(p){const line=cart.find(x=>x.id===p.id);if(line)line.qty++;else cart.push(window.WholesaleUI?WholesaleUI.line(p):{...p,qty:1});renderCart()}return}
  const inc=e.target.closest("[data-inc]");if(inc){const x=cart.find(x=>x.id===inc.dataset.inc);if(x)x.qty++;renderCart();return}
  const dec=e.target.closest("[data-dec]");if(dec){const x=cart.find(x=>x.id===dec.dataset.dec);if(x&&--x.qty<=0)cart=cart.filter(y=>y.id!==x.id);renderCart();return}
  const del=e.target.closest("[data-delete]");if(del){await POSDB.remove("products",del.dataset.delete);await refresh();toast("Product removed");return}
@@ -37,10 +38,10 @@ $("checkout").addEventListener("click",async()=>{
  if(!cart.length)return;
  const method=$("paymentMethod").value;
  if(method!=="cash"&&!confirm("This records a payment method only. It does NOT verify that a digital payment succeeded. Continue?"))return;
- const total=cart.reduce((n,x)=>n+x.price*x.qty,0),sale={id:uid(),createdAt:Date.now(),currency:(await POSDB.get("settings","currency"))?.value||"AUD",items:cart.map(x=>({productId:x.id,name:x.name,sku:x.sku,unitPrice:x.price,quantity:x.qty})),total,paymentMethod:method,paymentVerified:method==="cash",syncStatus:"pending"};
+ const total=cart.reduce((n,x)=>n+x.price*x.qty,0),sale={id:uid(),createdAt:Date.now(),currency:(await POSDB.get("settings","currency"))?.value||"AUD",items:cart.map(x=>({productId:x.productId||x.id,name:x.name,sku:x.sku,unitPrice:x.price,quantity:x.qty,...(x.packId?{packId:x.packId,packUnits:x.packUnits}:{})})),total,paymentMethod:method,paymentVerified:method==="cash",syncStatus:"pending"};
  if(window.RetailUI&&!await RetailUI.decorateSale(sale,cart))return;
  await POSDB.put("sales",sale);
- for(const line of cart){const p=products.find(x=>x.id===line.id);if(p){p.stock=Math.max(0,p.stock-line.qty);await POSDB.put("products",p)}}
+ for(const line of cart){const p=products.find(x=>x.id===(line.productId||line.id));if(p){p.stock=Math.max(0,p.stock-line.qty*(line.packUnits||1));await POSDB.put("products",p)}}
  cart=[];await refresh();toast("Sale saved. Receipt ID: "+sale.id);if(window.RetailUI)RetailUI.afterSale(sale);
 });
 $("clearCart").addEventListener("click",()=>{cart=[];renderCart()});
@@ -50,4 +51,4 @@ $("settingsForm").addEventListener("submit",async e=>{e.preventDefault();const f
 $("syncNow").addEventListener("click",async()=>{try{await POSSynchroniser.run()}catch(e){toast("Sync not completed: "+e.message)}});
 function connection(){const online=navigator.onLine;$("onlineDot").classList.toggle("online",online);$("connectionText").textContent=online?"Internet available":"Offline mode";if(!online)setSyncUI("Working offline","Sales remain saved on this device.");}
 window.addEventListener("online",()=>{connection();POSSynchroniser.run().catch(()=>{})});window.addEventListener("offline",connection);
-(async()=>{await POSDB.open();$("year").textContent=new Date().getFullYear();await refresh();await TierUI.init();await RetailUI.init();await HelpCentre.init();connection();if("serviceWorker"in navigator)navigator.serviceWorker.register("./service-worker.js").catch(console.error)})();
+(async()=>{await POSDB.open();$("year").textContent=new Date().getFullYear();await refresh();await TierUI.init();await RetailUI.init();await WholesaleUI.init();await HelpCentre.init();connection();if("serviceWorker"in navigator)navigator.serviceWorker.register("./service-worker.js").catch(console.error)})();
