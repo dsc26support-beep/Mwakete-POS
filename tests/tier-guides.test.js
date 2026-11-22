@@ -31,7 +31,13 @@ test("tier and Retail guides exist and are findable by search", () => {
 });
 
 test("guides are honest: Wholesale is coming soon, camera scanning is unavailable, data is device-only", () => {
-  assert.match(text("g-tiers"), /Wholesale .*coming soon/);
+  assert.match(
+    text("g-tiers"),
+    /invoices, credit accounts, purchase orders and quotes are coming soon/i,
+  );
+  assert.match(text("g-price-lists"), /credit accounts are not active yet/);
+  assert.match(text("g-price-lists"), /this device only/);
+  assert.match(text("g-pack-sizes"), /72 single units/);
   assert.match(text("g-tiers"), /kept/);
   assert.match(text("g-barcode"), /camera is not available yet/);
   assert.match(text("g-customers-reports"), /this device only/);

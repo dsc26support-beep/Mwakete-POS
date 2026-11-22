@@ -97,6 +97,39 @@ test("a Retail sale with a discount is accepted and its new columns are stored",
   assert.deepEqual(Array.from(rows[1].slice(6)), [0.5, "c-1", "retail"]);
 });
 
+test("a Wholesale pack sale is validated by arithmetic and stored with its tier", () => {
+  const { post, rows } = load();
+  const items = [
+    { productId: "p", name: "Rice", unitPrice: 8.5, quantity: 1 },
+    {
+      productId: "p",
+      name: "Rice (Carton x24)",
+      unitPrice: 204,
+      quantity: 2,
+      packId: "pack1",
+      packUnits: 24,
+    },
+  ];
+  const r = post(
+    sync([
+      sale({
+        id: "w1",
+        total: 416.5,
+        tier: "wholesale",
+        priceListId: "trade",
+        customerId: "c-9",
+        items,
+      }),
+    ]),
+  );
+  assert.deepEqual(r.acceptedIds, ["w1"]);
+  assert.equal(rows[1][8], "wholesale");
+  assert.equal(
+    post(sync([sale({ id: "w2", total: 416, tier: "wholesale", items })])).ok,
+    false,
+  );
+});
+
 test("floating-point sums are tolerated (0.1 x 3)", () => {
   const { post } = load();
   const r = post(

@@ -197,8 +197,8 @@ const eq = (a, b, msg) => {
   await page.click('[data-view="setup"]');
   eq(
     await page.locator("[data-tier]:disabled").count(),
-    1,
-    "Wholesale is shown but disabled (coming soon)",
+    0,
+    "all three business types are selectable",
   );
   await page.click('[data-tier="retail"]');
   await page.waitForSelector('[data-view="reports"]:not(.hidden)');

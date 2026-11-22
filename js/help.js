@@ -66,7 +66,7 @@ const HelpCentre = (() => {
   // Opt-in technical details only: no sales, product or customer data.
   function diagnostics() {
     return {
-      appVersion: "shell-v6",
+      appVersion: "shell-v7",
       online: navigator.onLine,
       userAgent: navigator.userAgent,
     };

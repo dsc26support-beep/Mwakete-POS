@@ -25,8 +25,8 @@ test("an install with no tier saved is Counter (existing users unchanged)", asyn
   assert.equal(await T.getTier(fakeStore()), "counter");
 });
 
-test("unknown, empty and unavailable tiers all fall back to Counter", async () => {
-  for (const bad of ["", "admin", null, undefined, "__proto__", "wholesale"]) {
+test("unknown and empty tiers all fall back to Counter", async () => {
+  for (const bad of ["", "admin", null, undefined, "__proto__", "Wholesale "]) {
     const s = fakeStore({ settings: [{ key: "tier", value: bad }] });
     assert.equal(await T.getTier(s), "counter", String(bad));
   }
@@ -50,22 +50,38 @@ test("Counter has no Retail features; Retail has all of them", () => {
   assert.equal(T.has("nonsense", "reports"), false);
 });
 
-test("Wholesale is declared but not selectable yet, and includes Retail features", () => {
-  assert.equal(T.TIERS.wholesale.available, false);
+test("Wholesale includes every Retail feature plus only the features PR 1 ships", () => {
+  assert.equal(T.TIERS.wholesale.available, true);
   assert.ok(
     T.TIERS.retail.features.every((f) =>
       T.TIERS.wholesale.features.includes(f),
     ),
   );
-  assert.equal(T.canChange("counter", "wholesale").ok, false);
+  for (const f of ["priceTiers", "bulkUnits", "tradeCustomers", "tax"]) {
+    assert.equal(T.has("wholesale", f), true, f);
+    assert.equal(T.has("retail", f), false, f);
+    assert.equal(T.has("counter", f), false, f);
+  }
+  // Later Wholesale PRs: still off, so nothing half-built is visible.
+  for (const f of ["invoices", "purchaseOrders", "quotes"])
+    assert.equal(T.has("wholesale", f), false, f);
+  assert.equal(T.canChange("counter", "wholesale").ok, true);
 });
 
-test("setTier saves Retail and rejects unknown / unavailable tiers without changing anything", async () => {
+test("switching from Wholesale to Retail warns that Wholesale screens are hidden and data is kept", () => {
+  assert.match(T.changeWarning("wholesale", "retail"), /data is kept/i);
+  assert.equal(T.changeWarning("retail", "wholesale"), "");
+});
+
+test("setTier saves Retail and Wholesale and rejects unknown tiers without changing anything", async () => {
   const s = fakeStore();
   const r = await T.setTier(s, "retail");
   assert.equal(r.ok, true);
   assert.equal(await T.getTier(s), "retail");
-  for (const bad of ["wholesale", "root", ""]) {
+  assert.equal((await T.setTier(s, "wholesale")).ok, true);
+  assert.equal(await T.getTier(s), "wholesale");
+  await T.setTier(s, "retail");
+  for (const bad of ["root", "", "Wholesale "]) {
     assert.equal((await T.setTier(s, bad)).ok, false);
     assert.equal(await T.getTier(s), "retail");
   }

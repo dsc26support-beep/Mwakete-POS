@@ -40,7 +40,11 @@ const RetailUI = (() => {
       .map((c) => `<option value="${R.esc(c)}"></option>`)
       .join("");
     $("customerList").innerHTML = customers.length
-      ? customers.map(R.customerRow).join("")
+      ? customers
+          .map((c) =>
+            R.customerRow(c, window.WholesaleUI ? WholesaleUI.badge(c) : ""),
+          )
+          .join("")
       : '<p class="empty">No customers yet.</p>';
     const sel = $("saleCustomer"),
       keep = sel.value;
@@ -99,6 +103,7 @@ const RetailUI = (() => {
     sale.items = sale.items.map((it, i) =>
       cart[i] && cart[i].category ? { ...it, category: cart[i].category } : it,
     );
+    if (window.WholesaleUI) WholesaleUI.decorateSale(sale, cart);
     return true;
   }
 
@@ -106,6 +111,7 @@ const RetailUI = (() => {
     $("discountType").value = "none";
     $("discountValue").value = "";
     $("saleCustomer").value = "";
+    if (window.WholesaleUI) WholesaleUI.afterSale();
     if (T.has(tier, "receipts")) showReceipt(sale);
   }
 
@@ -131,7 +137,9 @@ const RetailUI = (() => {
       toast(v.error);
       return null;
     }
-    return v.value;
+    const w = window.WholesaleUI ? WholesaleUI.productExtras() : {};
+    if (!w) return null;
+    return { ...v.value, ...w };
   }
 
   async function init() {
@@ -143,6 +151,11 @@ const RetailUI = (() => {
       e.preventDefault();
       const code = e.target.value;
       const p = R.findBySku(await POSDB.all("products"), code);
+      if (!p && window.WholesaleUI && (await WholesaleUI.addPackBySku(code))) {
+        e.target.value = "";
+        e.target.dispatchEvent(new Event("input"));
+        return;
+      }
       if (!p) return toast("No product with that barcode.");
       e.target.value = "";
       e.target.dispatchEvent(new Event("input"));
@@ -155,12 +168,16 @@ const RetailUI = (() => {
       e.preventDefault();
       const form = e.currentTarget,
         f = form.elements;
+      const extras = window.WholesaleUI ? WholesaleUI.customerExtras() : {};
+      if (!extras) return;
       const r = await R.addCustomer(
         POSDB,
         { name: f.name.value, phone: f.phone.value, notes: f.notes.value },
         newId(),
       );
       if (!r.ok) return toast(r.error);
+      if (Object.keys(extras).length)
+        await POSDB.put("customers", { ...r.item, ...extras });
       form.reset();
       await render();
       toast("Customer saved on this device.");

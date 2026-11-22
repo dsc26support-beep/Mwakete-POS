@@ -25,6 +25,7 @@
       <button class="tab" data-view="products">Products</button>
       <button class="tab" data-view="sales">Sales history</button>
       <button class="tab hidden" data-view="customers" data-feature="customers">Customers</button>
+      <button class="tab hidden" data-view="pricelists" data-feature="priceTiers">Price lists</button>
       <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
       <button class="tab" data-view="setup">Business setup</button>
       <button class="tab" data-view="help">Help &amp; guides</button>
@@ -49,6 +50,10 @@
             <label class="field-label" for="saleCustomer">Customer (optional)</label>
             <select id="saleCustomer"><option value="">Walk-in</option></select>
           </div>
+          <div data-feature="priceTiers" class="retail-box hidden">
+            <label class="field-label" for="salePriceList">Price list</label>
+            <select id="salePriceList"><option value="">Base price</option></select>
+          </div>
           <label class="field-label" for="paymentMethod">Payment method</label>
           <select id="paymentMethod"><option value="cash">Cash</option><option value="other">Other (record only)</option></select>
           <button id="checkout" class="button primary full" disabled>Complete cash sale</button>
@@ -67,6 +72,15 @@
           <label data-feature="categories" class="hidden">Category<input name="category" maxlength="40" list="categoryList" placeholder="Optional"></label>
           <label data-feature="lowStock" class="hidden">Reorder level<input name="reorderLevel" type="number" min="0" step="1" placeholder="Optional"></label>
           <datalist id="categoryList"></datalist>
+          <div id="productPrices" data-feature="priceTiers" class="hidden prices-grid"></div>
+          <fieldset data-feature="bulkUnits" class="hidden packs-box">
+            <legend>Pack sizes (optional)</legend>
+            <p class="hint">A pack sells several units at once, e.g. Carton = 24. Leave the pack price empty to charge unit price × units. Stock is always counted in single units.</p>
+            <div class="pack-row"><input name="pack1Name" maxlength="30" placeholder="Name (Carton)" aria-label="Pack 1 name"><input name="pack1Units" type="number" min="2" step="1" placeholder="Units" aria-label="Pack 1 units"><input name="pack1Price" type="number" min="0" step="0.01" placeholder="Price (optional)" aria-label="Pack 1 price"><input name="pack1Sku" maxlength="80" placeholder="Barcode (optional)" aria-label="Pack 1 barcode"></div>
+            <div class="pack-row"><input name="pack2Name" maxlength="30" placeholder="Name" aria-label="Pack 2 name"><input name="pack2Units" type="number" min="2" step="1" placeholder="Units" aria-label="Pack 2 units"><input name="pack2Price" type="number" min="0" step="0.01" placeholder="Price (optional)" aria-label="Pack 2 price"><input name="pack2Sku" maxlength="80" placeholder="Barcode (optional)" aria-label="Pack 2 barcode"></div>
+            <div class="pack-row"><input name="pack3Name" maxlength="30" placeholder="Name" aria-label="Pack 3 name"><input name="pack3Units" type="number" min="2" step="1" placeholder="Units" aria-label="Pack 3 units"><input name="pack3Price" type="number" min="0" step="0.01" placeholder="Price (optional)" aria-label="Pack 3 price"><input name="pack3Sku" maxlength="80" placeholder="Barcode (optional)" aria-label="Pack 3 barcode"></div>
+          </fieldset>
+          <label data-feature="tax" class="check hidden"><input type="checkbox" name="taxExempt"> Tax exempt (no tax on this product when invoices are added)</label>
           <button class="button primary" type="submit">Add product</button>
         </form>
         <div id="productTable" class="table-wrap"></div>
@@ -88,9 +102,25 @@
           <label>Name<input name="name" maxlength="80" required placeholder="Customer name"></label>
           <label>Phone (optional)<input name="phone" maxlength="20" placeholder="+686 …"></label>
           <label>Note (optional)<input name="notes" maxlength="300" placeholder="Short note"></label>
+          <label data-feature="tradeCustomers" class="hidden">Customer type<select name="customerType"><option value="retail">Regular customer</option><option value="trade">Trade customer</option></select></label>
+          <label data-feature="tradeCustomers" class="hidden">Price list (trade)<select name="priceListId" id="customerPriceList"><option value="">Base price</option></select></label>
+          <label data-feature="tradeCustomers" class="hidden">Credit limit (trade, optional)<input name="creditLimit" type="number" min="0" step="0.01" placeholder="0.00"></label>
+          <label data-feature="tradeCustomers" class="hidden">Payment terms (trade, optional)<input name="terms" maxlength="40" placeholder="e.g. 30 days"></label>
+          <label data-feature="tradeCustomers" class="hidden">Customer tax number (trade, optional)<input name="taxNumber" maxlength="30" placeholder="Optional"></label>
           <button class="button primary" type="submit">Save customer</button>
         </form>
         <div id="customerList"></div>
+      </div>
+    </section>
+    <section id="view-pricelists" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">WHOLESALE</p><h2>Price lists</h2></div></div>
+        <p class="hint">Create lists such as Trade or Distributor. Set each product's price for a list in <strong>Products</strong>; products without a price for a list use their base price. Assign a list to a trade customer in <strong>Customers</strong>, or pick one at the till. Saved on <strong>this device only</strong>.</p>
+        <form id="priceListForm" class="settings-form">
+          <label>New price list<input name="name" maxlength="40" required placeholder="e.g. Trade"></label>
+          <button class="button primary" type="submit">Add price list</button>
+        </form>
+        <div id="priceListList"></div>
       </div>
     </section>
     <section id="view-reports" class="view hidden">
@@ -104,6 +134,15 @@
         <p class="eyebrow">BUSINESS TYPE</p><h2>Choose your POS</h2>
         <p class="muted">Pick what fits your business. You can change this later; your products and sales are kept.</p>
         <div id="tierChoices" class="chips"></div>
+      </div>
+      <div class="panel setup-panel hidden" data-feature="tax">
+        <p class="eyebrow">WHOLESALE</p><h2>Tax</h2>
+        <p class="muted">Used on Wholesale invoices and quotes (coming next). Prices are entered before tax. Default 12.5%.</p>
+        <form id="taxForm" class="settings-form">
+          <label>Tax rate (%)<input name="taxRate" type="number" min="0" max="100" step="0.01" value="12.5" required></label>
+          <label>Your tax registration number (optional)<input name="taxNumber" maxlength="30" placeholder="Optional"></label>
+          <button class="button primary" type="submit">Save tax settings</button>
+        </form>
       </div>
       <div class="panel setup-panel">
         <p class="eyebrow">GET STARTED</p><h2>Set up your business</h2>
@@ -169,6 +208,8 @@
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
   <script src="./js/retail.js"></script>
+  <script src="./js/wholesale.js"></script>
+  <script src="./js/wholesale-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
