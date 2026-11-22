@@ -24,6 +24,8 @@
       <button class="tab active" data-view="sale">Quick sale</button>
       <button class="tab" data-view="products">Products</button>
       <button class="tab" data-view="sales">Sales history</button>
+      <button class="tab hidden" data-view="customers" data-feature="customers">Customers</button>
+      <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
       <button class="tab" data-view="setup">Business setup</button>
       <button class="tab" data-view="help">Help &amp; guides</button>
     </nav>
@@ -37,7 +39,16 @@
         <aside class="panel cart">
           <div class="section-heading"><div><p class="eyebrow">CURRENT SALE</p><h2>Cart <span id="cartCount" class="count">0</span></h2></div><button id="clearCart" class="text-button">Clear</button></div>
           <div id="cartItems" class="cart-items"><p class="empty">Your cart is empty.</p></div>
-          <div class="totals"><div><span>Subtotal</span><strong id="subtotal">0.00</strong></div><div class="grand"><span>Total</span><strong id="total">0.00</strong></div></div>
+          <div class="totals"><div><span>Subtotal</span><strong id="subtotal">0.00</strong></div><div id="discountRow" class="hidden"><span>Discount</span><strong id="discountAmount">-0.00</strong></div><div class="grand"><span>Total</span><strong id="total">0.00</strong></div></div>
+          <div data-feature="discounts" class="retail-box hidden">
+            <label class="field-label" for="discountType">Discount</label>
+            <div class="inline"><select id="discountType"><option value="none">None</option><option value="percent">Percent (%)</option><option value="fixed">Fixed amount</option></select><input id="discountValue" type="number" min="0" step="0.01" placeholder="0" aria-label="Discount value"></div>
+            <p id="discountNote" class="hint hidden"></p>
+          </div>
+          <div data-feature="customers" class="retail-box hidden">
+            <label class="field-label" for="saleCustomer">Customer (optional)</label>
+            <select id="saleCustomer"><option value="">Walk-in</option></select>
+          </div>
           <label class="field-label" for="paymentMethod">Payment method</label>
           <select id="paymentMethod"><option value="cash">Cash</option><option value="other">Other (record only)</option></select>
           <button id="checkout" class="button primary full" disabled>Complete cash sale</button>
@@ -53,15 +64,47 @@
           <label>Price<input name="price" type="number" min="0" step="0.01" required placeholder="0.00"></label>
           <label>Opening stock<input name="stock" type="number" min="0" step="1" value="0" required></label>
           <label>Barcode / SKU<input name="sku" maxlength="80" placeholder="Optional"></label>
+          <label data-feature="categories" class="hidden">Category<input name="category" maxlength="40" list="categoryList" placeholder="Optional"></label>
+          <label data-feature="lowStock" class="hidden">Reorder level<input name="reorderLevel" type="number" min="0" step="1" placeholder="Optional"></label>
+          <datalist id="categoryList"></datalist>
           <button class="button primary" type="submit">Add product</button>
         </form>
         <div id="productTable" class="table-wrap"></div>
+      </div>
+      <div class="panel hidden" data-feature="lowStock">
+        <p class="eyebrow">STOCK ALERTS</p><h2>Low stock</h2>
+        <p class="hint">Products at or below their reorder level. Stock counts are kept on this device.</p>
+        <div id="lowStockList"></div>
       </div>
     </section>
     <section id="view-sales" class="view hidden">
       <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div><div id="salesList"></div></div>
     </section>
+    <section id="view-customers" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">RETAIL</p><h2>Customers</h2></div></div>
+        <p class="hint">Saved on <strong>this device only</strong>, not encrypted, and never shared with other businesses. Only an anonymous ID is attached to a sale; names and phone numbers are not synchronised.</p>
+        <form id="customerForm" class="settings-form">
+          <label>Name<input name="name" maxlength="80" required placeholder="Customer name"></label>
+          <label>Phone (optional)<input name="phone" maxlength="20" placeholder="+686 …"></label>
+          <label>Note (optional)<input name="notes" maxlength="300" placeholder="Short note"></label>
+          <button class="button primary" type="submit">Save customer</button>
+        </form>
+        <div id="customerList"></div>
+      </div>
+    </section>
+    <section id="view-reports" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">RETAIL</p><h2>Reports</h2></div></div>
+        <div id="reportBody"></div>
+      </div>
+    </section>
     <section id="view-setup" class="view hidden">
+      <div class="panel setup-panel">
+        <p class="eyebrow">BUSINESS TYPE</p><h2>Choose your POS</h2>
+        <p class="muted">Pick what fits your business. You can change this later; your products and sales are kept.</p>
+        <div id="tierChoices" class="chips"></div>
+      </div>
       <div class="panel setup-panel">
         <p class="eyebrow">GET STARTED</p><h2>Set up your business</h2>
         <p class="muted">Your business name and currency are stored locally on this device. Connect a Google backend when the secure provisioning service is configured.</p>
@@ -113,11 +156,21 @@
     </section>
     <footer>© <span id="year"></span> Mwakete POS · Built for businesses in Kiribati</footer>
   </main>
+  <div id="receiptPanel" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt">
+    <div class="modal-card">
+      <div id="receiptBody"></div>
+      <div class="modal-actions"><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
+    </div>
+  </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="./js/db.js"></script>
   <script src="./js/integrations/google.js"></script>
   <script src="./js/integrations/mwakete.js"></script>
   <script src="./js/sync.js"></script>
+  <script src="./js/tiers.js"></script>
+  <script src="./js/retail.js"></script>
+  <script src="./js/tier-ui.js"></script>
+  <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
   <script src="./js/help.js"></script>
   <script src="./js/app.js"></script>

@@ -15,9 +15,25 @@ Standalone, no-build-step PWA starter for a free, offline-first point of sale.
   - Search (title, subtitle, description), categories, step-by-step guides, bookmarks, recently viewed.
   - External links: https only, no embedded credentials, no localhost/IP/intranet hosts, `rel="noopener noreferrer"`, and a confirmation naming the destination site before leaving the app.
   - **Not implemented yet:** admin publish/update/archive UI and remote guide updates (needs the authenticated Mwakete backend), owner-vs-cashier permissions, cross-device sync of business links, screenshots, video tutorials, delivery of problem reports to Mwakete (see below), and an official Mwakete Marketplace link (URL not yet supplied; add it to `OFFICIAL_LINKS` once confirmed).
-  - **Support contacts** (supplied by the Mwakete owner, in `SUPPORT_CONTACTS` in `js/guides.js`): email `admin@mwakete.com`, Messenger `https://m.me/moote.nakau`, phone `73052765` (no country code assumed). Shown under "Contact Mwakete Support"; Messenger goes through the leave-the-app confirmation. The Messenger handle looks like a personal profile — confirm it is the intended business channel.
+  - **Support contacts** (supplied by the Mwakete owner, in `SUPPORT_CONTACTS` in `js/guides.js`): email `admin@mwakete.com`, Messenger `https://m.me/moote.nakau`, phone `+686 73052765` (Kiribati). Shown under "Contact Mwakete Support"; Messenger goes through the leave-the-app confirmation. The Messenger handle looks like a personal profile — confirm it is the intended business channel.
   - **Report a problem:** form on the Help tab (also "Report a problem with this guide"). Reports are saved **on this device only (`helpReports`) and are never sent automatically** — each is labelled "Not sent". Users can Copy a report, or Email it to `SUPPORT_EMAIL` (`admin@mwakete.com`), which opens the user's own email app — nothing is sent until they press send there. Technical details (app version, online status, browser) are opt-in and contain no sales, product or customer data. A server-side report inbox needs the authenticated backend.
   - To change an official guide, edit `OFFICIAL_GUIDES` in `js/guides.js`, and bump `CACHE` in `service-worker.js` so devices refresh.
+
+## Business types (tiers)
+One app, three tiers, chosen in **Business setup → Business type** (stored locally under the `tier` setting). Switching never deletes data; it only shows or hides screens.
+
+| Tier | For | Status |
+| --- | --- | --- |
+| **Counter** | Restaurants, micro-sellers (very limited products) | The original app, unchanged. Default for every existing install. |
+| **Retail** | Shops with many products | Barcode scan-to-add (keyboard-style scanner + Enter, exact SKU match), reorder levels and low-stock list, product categories, percent/fixed discounts, receipts (print/copy/reopen from Sales history), customers, and reports (sales by day/category, top products, stock value). |
+| **Wholesale** | Trade sellers | **Not built yet** (shown as "coming soon"). Planned: price tiers, bulk units, trade customer accounts/invoices, purchase orders, quotes/delivery notes. See `docs/ROADMAP.md`. |
+
+Important limits:
+- The tier is a **UI setting, not an authorization boundary**. Real enforcement needs the authenticated backend.
+- Customers, reports, stock counts and discounts are **local to the device** (IndexedDB). Reports are not the cloud ledger. Customer names/phones are never synchronised; a sale carries only an opaque `customerId`.
+- Not included: camera barcode scanning, thermal-printer drivers, cross-device customer sync.
+- Data model is additive only: IndexedDB version 2 adds a `customers` store; products gain optional `category`/`reorderLevel`; Retail sales gain optional `tier`, `subtotal`, `discount`, `customerId`. Counter sales are saved exactly as before.
+- The sample Apps Script (`google-apps-script/Code.gs`) now recomputes every sale in integer cents and **rejects** a total that does not equal items minus discount, a discount above the subtotal, or malformed line items. It also stores Discount / Customer ID / Tier columns and upgrades an old 6-column sheet header. Re-deploy your Apps Script after updating.
 
 ## Tests
 No build step or dependencies. Requires Node 20+:
@@ -26,7 +42,15 @@ No build step or dependencies. Requires Node 20+:
 npm test
 ```
 
-`tests/guides.test.js` covers guide integrity, search, URL safety, business link/note storage, bookmarks, recent list, and HTML escaping.
+`npm test` runs the unit tests in `tests/*.test.js`: guides/reports/support contacts, tier rules, discount/receipt/report/customer logic, and the real `Code.gs` loaded with stubbed Google services (validation, idempotency, header upgrade).
+
+Browser test (optional, needs Playwright + Chromium; not part of `npm test`):
+
+```powershell
+npm run test:e2e
+```
+
+`tests/e2e/tiers.e2e.js` seeds a v1 database like an existing install, upgrades it, and checks Counter is unchanged, Retail features work, offline reload keeps data, and switching tiers keeps data.
 
 ## Important status
 This is a **working local prototype / integration foundation**, not a production-ready POS. It does not yet implement secure Google OAuth, automatic Google Drive/Sheets/Apps Script provisioning, production authentication, Mwakete API integration, refunds, staff permissions, multi-outlet inventory, digital-payment verification, or a complete server-authoritative stock ledger. Do not use it for live business transactions until those items are implemented and independently tested.
