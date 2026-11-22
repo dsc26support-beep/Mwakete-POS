@@ -1,32 +1,32 @@
-# Handoff — Mwakete POS tiers + Help centre
-Branch: claude/beautiful-fermi-vdsx4j (reset to main @ 6378cff after merge). PR #1 and #2 both MERGED. No open PR.
+# Handoff — Mwakete POS Wholesale tier
+Branch: claude/beautiful-fermi-vdsx4j | Draft PR: dsc26support-beep/Mwakete-POS#3 (Wholesale PR 1 of 4). PR #1, #2 merged.
 
 ## Goal
-One app, 3 tiers chosen in Business setup: Counter (existing app, restaurants/micro-sellers), Retail (shops), Wholesale (trade). Plus Help & guides, Report a problem, support contacts.
+3 tiers in one app (Counter/Retail/Wholesale). Wholesale delivered in 4 PRs: 1 trade selling, 2 invoices + credit ledger, 3 purchase orders, 4 quotes + delivery notes.
 
 ## Next steps
-1. USER must re-deploy google-apps-script/Code.gs (new server-side total/discount validation; old script accepts any total).
-2. Plan then build Wholesale in its own PR (user said to do it next only when asked): price tiers, bulk units, trade customers/invoices/credit, purchase orders, quotes/delivery notes.
-3. Confirm Messenger handle moote.nakau is the business channel; get Marketplace URL -> OFFICIAL_LINKS in js/guides.js.
-4. Optional: drop .handoff/LIVE.md from main if user does not want session notes in the repo.
+1. User: review/merge PR #3 (asked "mark ready and merge?" — not yet answered).
+2. On user go-ahead: PR 2 invoices + credit ledger. Plan is in /root/.claude/plans/i-want-a-3-shimmering-parrot.md (may vanish): Apps Script ledger sheets (Invoices, InvoiceLines, Payments, Customers), server recomputes subtotal/tax/total in cents, balances computed server-side, idempotent by client id, invoice no. INV-<device code>-<n>, over-limit flag, apply tax here.
+3. USER must re-deploy google-apps-script/Code.gs (Retail validation from PR #2 still not confirmed deployed).
+4. Open: Messenger handle moote.nakau? Marketplace URL?
 
 ## State
-- Shipped on main: Counter/Retail tiers (js/tiers.js, retail.js, tier-ui.js, retail-ui.js), IndexedDB v2 (+customers), Retail guides, Code.gs validation, Help centre, Report a problem, support contacts (admin@mwakete.com, m.me/moote.nakau, +686 73052765). SW cache v6.
-- Tests at merge: npm test 58/58; npm run test:e2e 41/41. Not tested: Android devices, printers, camera scan, real Apps Script, mail/dialler.
+- PR #3 pushed (61a3b9f): js/wholesale.js (pure), js/wholesale-ui.js, tiers.js (wholesale available; flags priceTiers, bulkUnits, tradeCustomers, tax), IndexedDB v3 (+priceLists), guides, docs, SW cache v7.
+- Tests: npm test 81/81; test:e2e tiers 41/41 + wholesale 54/54. Not tested: Android, printers, camera, real Apps Script.
+- Tax NOT applied to any sale yet (settings + maths only). Wholesale sales are till-paid like Retail until PR 2.
 
-## Decisions
-- One app + tier setting (not 3 apps). Missing tier => counter, so existing installs unchanged. Tier is UI-only, NOT authorization.
-- Customers local-only/unencrypted; sales carry opaque customerId only.
-- Money in integer cents; server recomputes and rejects mismatches.
-- Wholesale credit/invoices = production blocker until server-authoritative ledger.
-- Merge commits used for both PRs.
+## Decisions (user chose)
+- Tax 12.5%, prices before tax, all items taxed unless per-product exempt; tax on invoices/quotes only (not Counter/Retail).
+- Named price lists; pack sizes (stock in base units); real Apps Script ledger; 4 PRs; ledger labelled "not production-ready until authenticated sign-in exists".
+- Tax computed once on taxable subtotal, round half up (integer cents).
+- Pack price fixed regardless of list; blank = unit price (list or base) x units.
 
 ## Gotchas
-- PostToolUse formatter reformats on Edit/Write (bloated app.js once). Patch minified files with exact-match python (ruff must pass); check git diff --stat.
-- Bash hook: max 500 chars / 10 statements. `git push` blocked by sixth-sense; user authorised override -> run scratchpad push.sh.
-- `const X` in classic scripts is NOT window.X (expose explicitly).
-- Bump CACHE in service-worker.js (+appVersion in js/help.js) on any shipped JS change.
+- PostToolUse formatter reformats on Edit/Write: patch minified app.js/db.js/service-worker.js with exact-match python script in scratchpad (ruff clean); check git diff --stat.
+- Bash hook: max 500 chars/10 statements; `git push` blocked by sixth-sense, user authorised override -> run scratchpad push.sh.
+- Browser's native min/max validation blocks submit before app validation; e2e sets form.noValidate to test app checks.
+- `const X` in classic scripts is NOT window.X (expose explicitly). Bump SW CACHE + help.js appVersion on JS changes.
 - Stop hooks demand a push each time.
 
 ## Open questions
-- Messenger handle correct? Marketplace URL? Start Wholesale planning?
+- Merge PR #3? Start PR 2? Messenger handle? Marketplace URL?
