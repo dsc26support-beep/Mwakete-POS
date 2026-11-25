@@ -131,6 +131,7 @@ const RetailUI = (() => {
     $("receiptBody").innerHTML = R.receiptHtml(lastReceipt);
     $("receiptPanel").dataset.saleId = sale.id;
     if ($("receiptRefund")) $("receiptRefund").hidden = false;
+    if ($("receiptDelivery")) $("receiptDelivery").hidden = !sale.invoice;
     $("receiptPanel").classList.remove("hidden");
     $("receiptClose").focus();
   }
@@ -141,6 +142,7 @@ const RetailUI = (() => {
     $("receiptBody").innerHTML = R.receiptHtml(text);
     $("receiptPanel").dataset.saleId = "";
     if ($("receiptRefund")) $("receiptRefund").hidden = true;
+    if ($("receiptDelivery")) $("receiptDelivery").hidden = true;
     $("receiptPanel").classList.remove("hidden");
     $("receiptClose").focus();
   }

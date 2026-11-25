@@ -67,13 +67,12 @@ test("Wholesale includes every Retail feature plus only the features shipped so 
     "tax",
     "invoices",
     "purchaseOrders",
+    "quotes",
   ]) {
     assert.equal(T.has("wholesale", f), true, f);
     assert.equal(T.has("retail", f), false, f);
     assert.equal(T.has("counter", f), false, f);
   }
-  // Later Wholesale PRs: still off, so nothing half-built is visible.
-  for (const f of ["quotes"]) assert.equal(T.has("wholesale", f), false, f);
   assert.equal(T.canChange("counter", "wholesale").ok, true);
 });
 

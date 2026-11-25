@@ -29,6 +29,7 @@
       <button class="tab hidden" data-view="accounts" data-feature="invoices">Accounts</button>
       <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
       <button class="tab hidden" data-view="register" data-feature="register">Register</button>
+      <button class="tab hidden" data-view="quotes" data-feature="quotes">Quotes</button>
       <button class="tab hidden" data-view="stock" data-feature="stock">Stock</button>
       <button class="tab hidden" data-view="purchasing" data-feature="purchaseOrders" data-owner-only>Purchasing</button>
       <button class="tab" data-view="setup">Business setup</button>
@@ -121,6 +122,28 @@
         </div>
       </div>
       <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Past shifts</h2></div></div><div id="registerList"></div></div>
+    </section>
+    <section id="view-quotes" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">WHOLESALE</p><h2>Quotes</h2></div></div>
+        <p class="hint">A quote is an offer with prices and an expiry date. When the customer agrees, press <strong>Make invoice</strong>: the goods load into the till at the quoted prices and you finish the sale as normal. A quote can only become one invoice.</p>
+        <form id="quoteForm" class="settings-form">
+          <label>Customer<select name="customer" id="quoteCustomer"></select></label>
+          <label>Customer name (if not saved as a trade customer)<input name="customerName" maxlength="100"></label>
+          <div id="quoteLines" aria-live="polite"></div>
+          <fieldset class="po-add"><legend>Add a product to the quote</legend>
+            <label>Product<select id="quoteProduct"></select></label>
+            <label>Quantity<input id="quoteQty" type="number" inputmode="numeric" min="1" step="1"></label>
+            <label>Price each<input id="quotePrice" type="number" inputmode="decimal" min="0" step="0.01"></label>
+            <button class="button secondary" type="button" id="quoteAddLine">Add to quote</button>
+          </fieldset>
+          <label>Valid for (days)<input name="days" type="number" inputmode="numeric" min="1" max="365" step="1" value="14"></label>
+          <label>Note (optional)<input name="note" maxlength="200"></label>
+          <p id="quoteTotal" class="muted" role="status">Quote total: 0.00</p>
+          <button class="button primary" type="submit">Save quote</button>
+        </form>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">OFFERS</p><h2>Your quotes</h2></div></div><div id="quoteList"></div></div>
     </section>
     <section id="view-stock" class="view hidden">
       <div class="panel">
@@ -360,7 +383,7 @@
   <div id="receiptPanel" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt">
     <div class="modal-card">
       <div id="receiptBody"></div>
-      <div class="modal-actions"><button id="receiptRefund" class="button secondary" type="button" data-feature="refunds" hidden>Refund…</button><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
+      <div class="modal-actions"><button id="receiptRefund" class="button secondary" type="button" data-feature="refunds" hidden>Refund…</button><button id="receiptDelivery" class="button secondary" type="button" data-feature="quotes" hidden>Delivery note</button><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
     </div>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -373,6 +396,7 @@
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/stock.js"></script>
+  <script src="./js/trade.js"></script>
   <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
@@ -383,6 +407,7 @@
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/stock-ui.js"></script>
+  <script src="./js/quotes-ui.js"></script>
   <script src="./js/purchasing-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>

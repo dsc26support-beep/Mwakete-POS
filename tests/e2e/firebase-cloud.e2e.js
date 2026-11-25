@@ -377,6 +377,56 @@ const stamp = Date.now();
     "ok: purchase order and supplier synced; cashier has no Purchasing screen",
   );
 
+  /* ----- a quote becomes a real wholesale invoice; both reach the cloud under the hardened rules ----- */
+  await tab(owner, "quotes");
+  await owner.fill('#quoteForm [name="customerName"]', "Walk-in Trader");
+  await owner.fill("#quoteQty", "2");
+  await owner.click("#quoteAddLine");
+  await owner.click('#quoteForm button[type="submit"]');
+  await backedUp(owner, "quoteList");
+  let quoteDocs =
+    (await rest("businesses/" + ownerUid + "/quotes")).documents || [];
+  assert.equal(quoteDocs.length, 1);
+  assert.equal(quoteDocs[0].fields.status.stringValue, "open");
+  await owner.click('[data-quote-act="invoice"]');
+  await owner.waitForSelector("#view-sale:not(.hidden)");
+  await owner.click("#checkout");
+  await owner.waitForSelector("#receiptPanel:not(.hidden)");
+  await owner.click("#receiptClose");
+  await tab(owner, "quotes");
+  await owner.waitForFunction(
+    () =>
+      /Made into an invoice/.test(
+        document.getElementById("quoteList").textContent,
+      ) && /Backed up/.test(document.getElementById("quoteList").textContent),
+    null,
+    { timeout: 30000 },
+  );
+  quoteDocs =
+    (await rest("businesses/" + ownerUid + "/quotes")).documents || [];
+  assert.equal(
+    quoteDocs[0].fields.status.stringValue,
+    "converted",
+    "the converted quote reached the cloud",
+  );
+  const invoiceDocs = (
+    (await rest("businesses/" + ownerUid + "/sales")).documents || []
+  ).filter((d) => d.fields.invoice);
+  assert.equal(
+    invoiceDocs.length,
+    1,
+    "the wholesale tax invoice is in the cloud",
+  );
+  assert.equal(
+    invoiceDocs[0].fields.id.stringValue,
+    quoteDocs[0].fields.convertedSaleId.stringValue,
+    "and the quote points at it",
+  );
+  console.log("ok: quote converted to an invoice, both synced");
+  const salesBeforeDeactivation = (
+    (await rest("businesses/" + ownerUid + "/sales")).documents || []
+  ).length;
+
   /* ----- owner removes the cashier's access ----- */
   await tab(owner, "setup");
   await owner.click("#staffList [data-staff]");
@@ -397,7 +447,7 @@ const stamp = Date.now();
   );
   assert.equal(
     ((await rest("businesses/" + ownerUid + "/sales")).documents || []).length,
-    2,
+    salesBeforeDeactivation,
     "nothing new was stored",
   );
   console.log("ok: deactivated cashier is refused");

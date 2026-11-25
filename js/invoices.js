@@ -346,7 +346,7 @@ const InvoiceCore = (() => {
       invoiceTotal: 0,
       creditLimit: limit,
     });
-    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong><small>Confirmed ${money(confirmed)} (${esc(asOf)}) · pending on this device ${money(pending)} · limit ${limit === undefined || limit === null ? "not set" : money(limit)}</small></div><div class="row-actions"><strong class="${o.over ? "low" : ""}">${money(total)}${o.over ? " · OVER LIMIT" : ""}</strong></div></div>`;
+    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong><small>Confirmed ${money(confirmed)} (${esc(asOf)}) · pending on this device ${money(pending)} · limit ${limit === undefined || limit === null ? "not set" : money(limit)}</small></div><div class="row-actions"><button class="text-button" type="button" data-statement="${esc(c.id)}">Statement</button><strong class="${o.over ? "low" : ""}">${money(total)}${o.over ? " · OVER LIMIT" : ""}</strong></div></div>`;
   }
   function invoiceRow(s) {
     const inv = s.invoice;

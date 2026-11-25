@@ -27,6 +27,7 @@ async function refresh() {
   if (window.RetailUI) await RetailUI.render();
   if (window.RegisterUI) await RegisterUI.render();
   if (window.StockUI) await StockUI.render();
+  if (window.QuotesUI) await QuotesUI.render();
   if (window.PurchasingUI) await PurchasingUI.render();
 }
 function renderProducts() {
@@ -229,6 +230,7 @@ $("checkout").addEventListener("click", async () => {
   await refresh();
   toast("Sale saved. Receipt ID: " + sale.id);
   if (window.RetailUI) RetailUI.afterSale(sale);
+  if (window.QuotesUI) await QuotesUI.afterSale(sale);
 });
 $("clearCart").addEventListener("click", () => {
   cart = [];
@@ -290,6 +292,7 @@ window.addEventListener("offline", connection);
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();
+  await QuotesUI.init();
   await PurchasingUI.init();
   await HelpCentre.init();
   await CloudUI.init();

@@ -24,6 +24,7 @@ const TierCore = (() => {
     "tax",
     "invoices",
     "purchaseOrders",
+    "quotes",
   ];
   const TIERS = {
     counter: {
