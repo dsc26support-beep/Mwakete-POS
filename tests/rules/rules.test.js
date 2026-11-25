@@ -207,6 +207,17 @@ test("products: description, unit, archived and price history are accepted; bad 
   await assertFails(w("c2", { description: "x".repeat(301) }));
   await assertFails(w("c3", { archived: "yes" }));
   await assertFails(w("c4", { priceHistory: "none" }));
+  await assertSucceeds(
+    w("c7", { minQty: 12, qtyBreaks: [{ qty: 10, pct: 5 }] }),
+  );
+  await assertFails(w("c8", { minQty: 0 }));
+  await assertFails(w("c9", { minQty: 2.5 }));
+  await assertFails(w("c10", { qtyBreaks: "10:5" }));
+  await assertFails(
+    w("c11", {
+      qtyBreaks: [1, 2, 3, 4, 5, 6].map((n) => ({ qty: n + 1, pct: n })),
+    }),
+  );
   // cost price never leaves the device, so the cloud schema refuses it
   await assertFails(w("c5", { costPrice: 3 }));
   await assertFails(w("c6", { image: "data:image/png;base64,AAAA" }));

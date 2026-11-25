@@ -205,6 +205,7 @@
         listId: x.listId || "",
         ...(x.packId ? { packId: x.packId, packUnits: x.packUnits } : {}),
         ...(x.taxExempt ? { taxExempt: true } : {}),
+        ...(x.basePrice !== undefined ? { basePrice: x.basePrice } : {}),
       });
     }
     const total = fromMinor(

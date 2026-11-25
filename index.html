@@ -348,6 +348,14 @@
       </div>
     </section>
     <section id="view-setup" class="view hidden">
+      <div class="panel setup-panel" id="mwaketePanel">
+        <p class="eyebrow">OPTIONAL</p><h2>Mwakete Marketplace link</h2>
+        <p>Status: <strong id="mwStatus">Not connected</strong></p>
+        <p id="mwReason" class="muted"></p>
+        <p class="hint">This POS works fully without Mwakete: sales, stock and customers stay in your own business account. Selling through the marketplace would need these from the Mwakete team:</p>
+        <ul id="mwNeeds" class="hint"></ul>
+        <div class="row-actions"><button id="mwConnect" class="button primary" type="button" disabled>Connect to Mwakete</button><button id="mwDisconnect" class="button secondary" type="button" disabled>Disconnect</button></div>
+      </div>
       <div class="panel setup-panel" id="installPanel">
         <p class="eyebrow">INSTALL</p><h2>Use it like an app</h2>
         <p id="installText" class="muted"></p>
@@ -367,6 +375,15 @@
           <label>Lock after idle<select name="idle" id="idleSelect"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></label>
           <p id="pinState" class="hint" role="status"></p>
           <div class="row-actions"><button class="button primary" type="submit">Save lock settings</button><button class="button secondary" type="button" id="lockNow">Lock now</button><button class="button secondary" type="button" id="pinClear">Remove PIN</button></div>
+        </form>
+        <h3>Manager approval</h3>
+        <p class="muted">Ask for a manager's PIN when a discount or a refund is bigger than a limit you set. Leave a limit at 0 for no limit. Signed-in owners and managers are not asked.</p>
+        <form id="approvalForm" class="settings-form">
+          <label>Approval PIN (4 to 8 digits)<input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>
+          <label>Ask above this discount (%)<input name="discountPct" type="number" min="0" max="100" step="0.1" value="0"></label>
+          <label>Ask above this refund amount<input name="refundAmount" type="number" min="0" step="0.01" value="0"></label>
+          <p id="approvalState" class="hint" role="status"></p>
+          <div class="row-actions"><button class="button primary" type="submit">Save approval settings</button><button class="button secondary" type="button" id="approvalClear">Remove approval PIN</button></div>
         </form>
         <h3>Activity log</h3>
         <div class="filter-row" role="search"><input id="auditText" type="search" placeholder="Search the log" aria-label="Search the activity log"><select id="auditAction" aria-label="Type"><option value="">All activity</option></select></div>
@@ -536,6 +553,8 @@
         <label>Reorder level<input name="reorderLevel" type="number" min="0" step="1" placeholder="Optional"></label>
         <label>Unit<select name="unit"></select></label>
         <label>Description<textarea name="description" maxlength="300" rows="2"></textarea></label>
+        <label>Quantity discounts (one per line, like 10:5 = from 10 units 5% off)<textarea name="qtyBreaks" rows="2" maxlength="120"></textarea></label>
+        <label>Minimum quantity for trade (account) sales<input name="minQty" type="number" min="0" step="1" placeholder="Optional"></label>
         <label>Picture (stays on this device)<input name="imageFile" type="file" accept="image/*"></label>
         <label class="check"><input type="checkbox" name="clearImage"> Remove the picture</label>
         <label class="check"><input type="checkbox" name="archived"> Archived (hidden from the till, kept in reports)</label>
@@ -569,6 +588,17 @@
       <video id="scanVideo" class="scan-video" playsinline muted aria-label="Camera view"></video>
       <p id="scanStatus" class="hint" role="status" aria-live="polite">Point the camera at a barcode.</p>
       <div class="modal-actions"><button class="button primary" type="button" id="scanClose">Done</button></div>
+    </div>
+  </div>
+  <div id="approvePanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="approveTitle">
+    <div class="modal-card">
+      <h3 id="approveTitle">Manager approval needed</h3>
+      <p id="approveReason" class="muted"></p>
+      <form id="approveForm" class="settings-form">
+        <label>Manager PIN<input name="pin" id="approvePin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" required></label>
+        <p id="approveError" class="low" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="approveCancel">Cancel</button><button class="button primary" type="submit">Approve</button></div>
+      </form>
     </div>
   </div>
   <div id="lockScreen" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
@@ -619,6 +649,7 @@
   <script src="./js/db.js"></script>
   <script src="./js/integrations/google.js"></script>
   <script src="./js/integrations/mwakete.js"></script>
+  <script src="./js/integrations/mwakete-ui.js"></script>
   <script src="./js/integrations/firebase-config.js"></script>
   <script src="./js/integrations/firebase.js"></script>
   <script src="./js/cloud-ui.js"></script>

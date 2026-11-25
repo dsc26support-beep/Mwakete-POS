@@ -76,7 +76,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-054 | Inventory movement history | Partial | sales and returns write no movement |
 | POS-055 | Stock count | Verified | "count" action |
 | POS-056 | Stock reconciliation | Partial | single-product count only, no full stock-take or variance report |
-| POS-057 | Low-stock alerts | Partial | Retail low-stock list |
+| POS-057 | Low-stock alerts | Verified | low-stock list (Retail) and alert line + badges on Products (e2e/catalogue) |
 | POS-058 | Out-of-stock alerts | Verified | out-of-stock alert line and badges (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-059 | Stock valuation | Verified | valuation at selling price and at cost; products without cost are called out (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-060 | Inventory search | Verified | search by name, barcode, description (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
@@ -92,18 +92,18 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 |---|---|---|---|
 | POS-067 | Retail price | Verified | |
 | POS-068 | Wholesale price | Partial | price lists |
-| POS-069 | Customer-specific prices | Partial | per-customer price list, no per-product override |
+| POS-069 | Customer-specific prices | Partial | per-customer price list; no per-product customer override |
 | POS-070 | Bulk pricing | Partial | pack sizes |
-| POS-071 | Quantity-based discounts | Missing | |
+| POS-071 | Quantity-based discounts | Verified | up to 5 quantity discounts per product (from N units, P% off); price follows the quantity, never compounds, survives hold/resume (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
 | POS-072 | Manual discounts | Verified | |
 | POS-073 | Percentage discounts | Verified | |
 | POS-074 | Fixed amount discounts | Verified | |
-| POS-075 | Discount authorization rules | Missing | |
-| POS-076 | Minimum wholesale quantity | Missing | |
+| POS-075 | Discount authorization rules | Verified | discount above the shop's limit needs the manager PIN; owners and managers signed in are exempt; refused attempts are logged (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
+| POS-076 | Minimum wholesale quantity | Verified | product minimum quantity enforced on account / trade-customer sales (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
 | POS-077 | Pricing validation | Partial | |
 | POS-078 | Price change history | Verified | last 20 price changes per product, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-079 | Price rounding rules | Partial | exact cents; no cash rounding option |
-| POS-080 | Prevent unauthorized price overrides | Partial | no price editing at the till; rules cannot verify prices |
+| POS-080 | Prevent unauthorized price overrides | Partial | no price editing at the till; discounts need approval above a limit; the server still cannot verify prices (needs Cloud Functions) |
 
 ## F. Payments
 | ID | Capability | Status | Evidence / gap |
@@ -130,7 +130,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-096 | Generate receipt | Verified | |
 | POS-097 | Receipt number | Verified | R-<device>-<seq> on every new sale, shown on receipts (js/txn.js; tests/txn.test.js; e2e/txn) |
 | POS-098 | Receipt formatting | Verified | 32-column text |
-| POS-099 | Print receipt | Partial | browser print only; no thermal-printer driver |
+| POS-099 | Print receipt | Partial | browser Print and Copy; no thermal-printer driver (needs a real printer pilot) |
 | POS-100 | Digital receipt | Verified | copy as text, or send from the details dialog (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
 | POS-101 | Email receipt | Verified | mailto link opens the user's email app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid email service |
 | POS-102 | SMS receipt | Verified | sms link opens the user's messaging app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid SMS service |
@@ -167,7 +167,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-125 | Return inventory handling | Verified | restock option |
 | POS-126 | Refund recording | Verified | |
 | POS-127 | Refund payment method tracking | Verified | |
-| POS-128 | Refund authorization | Missing | no approval or limit for cashiers |
+| POS-128 | Refund authorization | Verified | refund above the shop's limit needs the manager PIN; override logged (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
 | POS-129 | Return history | Verified | |
 | POS-130 | Return audit trail | Partial | |
 
@@ -182,7 +182,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-136 | Automatic synchronization | Verified | |
 | POS-137 | Manual synchronization | Verified | |
 | POS-138 | Sync status indicator | Verified | |
-| POS-139 | Pending sync count | Partial | shown in sync message, no always-visible count |
+| POS-139 | Pending sync count | Verified | pending / refused counts under the sync status (js/pwa.js; e2e/pwa) |
 | POS-140 | Retry failed synchronization | Verified | backoff (unit + e2e) |
 | POS-141 | Prevent duplicate synchronization | Verified | |
 | POS-142 | Sync conflict handling | Partial | product edits: newest wins, no conflict state |
@@ -228,24 +228,28 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 ## M. Device, installability and interface
 | Capability | Status | Evidence / gap |
 |---|---|---|
-| Responsive mobile / tablet / desktop | Partial | one layout; no desktop sidebar |
-| Installable PWA, icon, manifest | Partial | SVG icon only: Android install needs PNG icons |
-| Offline shell, service worker lifecycle | Verified | resilience e2e; update prompt missing |
-| Local storage persistence | Partial | no storage-persist request |
-| Device registration / identification / management / removal | Missing | only an invoice device code |
-| Multiple devices per business, cross-device sync | Partial | cashiers yes; no device list |
-| Network status monitoring | Verified | |
-| Application update handling | Partial | silent update |
-| Data migration | Verified | IndexedDB upgrade tests |
-| Device recovery | Partial | |
-| Accessibility, keyboard support | Verified | tests/a11y |
-| Touch-friendly controls, adaptive navigation | Partial | |
+| Responsive mobile / tablet / desktop | Partial | one responsive layout, axe-clean at all editions; no separate desktop sidebar layout |
+| Installable PWA, icon, manifest | Verified | PNG 192/512 + maskable icons, id/scope, install button (tests/pwa.test.js, e2e/pwa). Not yet tried on a real phone |
+| Offline shell, service worker lifecycle | Verified | every script and icon cached (unit test checks the list); offline reload (e2e/pwa, resilience) |
+| Local storage persistence | Verified | asks the browser for persistent storage; status shown in Setup (best effort; browsers may refuse) |
+| Device registration / identification | Verified | device code + name, shown in Setup, stamped on every sale as `deviceId` (e2e/security) |
+| Device management / removal | Partial | staff access is removed by deactivating the account; no cloud list of devices and no remote wipe (needs a server) |
+| Multiple devices per business, cross-device sync | Partial | cashiers and managers sync through the cloud account; stock is per device |
+| Network status monitoring | Verified | online/offline badge, sync backlog count (e2e/pwa) |
+| Application update handling | Verified | update banner; the page never reloads by itself (e2e/pwa) |
+| Data migration | Verified | IndexedDB upgrade tests (tiers, wholesale, invoices e2e) |
+| Device recovery | Partial | backup file restore; no cloud restore |
+| Accessibility, keyboard support | Verified | axe scan of every screen, edition and dialog; dialog focus trap (tests/a11y). Screen reader not tested |
+| Touch-friendly controls, adaptive navigation | Partial | tab bar and large buttons; the Micro (Counter) edition is the simplified workspace; no per-edition layouts |
+| First-run onboarding | Verified | set-up card: name, currency, edition, accepted payments, device name (e2e/onboarding) |
 
 ## N. Optional Mwakete integration
 | Capability | Status | Evidence / gap |
 |---|---|---|
-| Independent POS operation without Mwakete | Verified | |
-| Connection, linking, store linking, sync of products/inventory/transactions, authorization, status, disconnect, error reporting, API contract verification, audit logging | N/A-ext | the Mwakete API contract is not available; the PDF forbids inventing APIs. A clearly "not configured" status screen and a documented contract template are planned |
+| Independent POS operation without Mwakete | Verified | everything runs without it |
+| Status, authorization, disconnect screens | Verified | Setup -> Mwakete Marketplace link: "Not connected", reason, needs list (tests/mwakete.test.js) |
+| Connection, store linking, sync of products / inventory / transactions, error reporting against a live API | N/A-ext | the Mwakete API contract was not supplied; no API is invented. docs/MWAKETE_INTEGRATION.md lists what is needed |
+| Marketplace data kept apart from independent-business data | Verified (by design) | the adapter makes no network call and stores nothing (tested) |
 
 ## Cross-cutting requirements (PDF sections 7–21)
 Tracked in `docs/CAPABILITY_REGISTER.md` updates below as they are verified: transaction and movement record fields (section 8), delivery states (10), customer privacy (11), report permission controls (13), security audit trail (14), onboarding (16), production acceptance criteria (20), documentation set (22).

@@ -124,6 +124,40 @@ test("lock-out after 5 wrong attempts, cleared on success", () => {
   assert.deepEqual(S.afterAttempt(st, true, 5), { fails: 0, lockedUntil: 0 });
 });
 
+test("approval is needed only above a limit that is set", () => {
+  const limits = { discountPct: 10, refundAmount: 50 };
+  assert.equal(S.needsApproval("discount", 10, limits), false);
+  assert.equal(S.needsApproval("discount", 10.01, limits), true);
+  assert.equal(S.needsApproval("refund", 50, limits), false);
+  assert.equal(S.needsApproval("refund", 50.01, limits), true);
+  assert.equal(S.needsApproval("discount", 99, { discountPct: 0 }), false);
+  assert.equal(S.needsApproval("discount", 99, undefined), false);
+  assert.equal(S.needsApproval("refund", 1e6, {}), false);
+});
+
+test("limit validation", () => {
+  assert.deepEqual(
+    S.validLimits({ discountPct: "15", refundAmount: "20.505" }).value,
+    { discountPct: 15, refundAmount: 20.51 },
+  );
+  assert.deepEqual(S.validLimits({ discountPct: "", refundAmount: "" }).value, {
+    discountPct: 0,
+    refundAmount: 0,
+  });
+  assert.equal(
+    S.validLimits({ discountPct: "101", refundAmount: "0" }).ok,
+    false,
+  );
+  assert.equal(
+    S.validLimits({ discountPct: "5", refundAmount: "-1" }).ok,
+    false,
+  );
+  assert.equal(
+    S.validLimits({ discountPct: "x", refundAmount: "1" }).ok,
+    false,
+  );
+});
+
 test("idle timing and device names", () => {
   assert.equal(S.idleDue(0, 0, 1e9), false);
   assert.equal(S.idleDue(0, 5, 4 * 60000), false);

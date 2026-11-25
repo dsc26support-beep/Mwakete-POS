@@ -71,9 +71,9 @@ Run everything with these (each prints its own pass/fail count):
 
 | What | Command | Needs |
 | --- | --- | --- |
-| Unit tests (267) | `npm test` | Node 20+ |
-| Browser suites (10: tiers, wholesale, invoices, refunds, register, stock, trade, CSV, resilience, backup) | `NODE_PATH=$(npm root -g) npm run test:e2e` | Playwright + Chromium |
-| Firestore rules, emulator (41) | `cd tests/rules && npm install && npm test` | Java 11+ |
+| Unit tests (349) | `npm test` | Node 20+ |
+| Browser suites (19: tiers, wholesale, invoices, refunds, register, stock, trade, CSV, resilience, backup, checkout, catalogue, transactions, delivery, analytics, security, scan, PWA, onboarding) | `NODE_PATH=$(npm root -g) npm run test:e2e` | Playwright + Chromium |
+| Firestore rules, emulator (50, including staff roles) | `cd tests/rules && npm install && npm test` | Java 11+ |
 | Cloud flows, owner + cashier, emulators | `NODE_PATH=$(npm root -g) npx -y firebase-tools@latest emulators:exec --only auth,firestore --project mwakete-pos "node tests/e2e/firebase-cloud.e2e.js"` | Playwright, Java 11+ |
 | Accessibility scan (axe, WCAG 2.1 A/AA, every screen and business type, plus keyboard checks on dialogs) | `cd tests/a11y && npm install && NODE_PATH=$(npm root -g) node a11y.e2e.js` | Playwright |
 
@@ -94,6 +94,16 @@ Automated accessibility checks catch only part of what matters. A person using a
 | Cloud (optional) | Email/password sign-in, verified email, owner and cashier roles, sync of sales, payments, credit notes, shifts, stock changes, products, purchase orders and quotes, owner's whole-business report | Business setup |
 | Offline | Everything above works offline; an unfinished sale survives a reload; failed syncs retry by themselves (30 s, then longer, at most every 15 min); long lists stay fast on a slow phone | Always |
 | Your data | Download and restore a backup file; diagnostics summary for support (no business content) | Business setup |
+| Payments | Cash with change due; EFTPOS, internet banking and M-PAiSA **recorded** (never verified); references; split payments; the shop picks which methods it accepts; hold and resume sales | Quick sale |
+| Products | Edit, archive, description, unit, cost price and picture (device only), bulk edits, filters, stock value, out-of-stock alerts, price history | Products |
+| Sales history | Receipt numbers, search, filters, details with record checks, CSV export | Sales |
+| Receipts | Send through your own email, SMS or WhatsApp app with a queue and statuses you confirm | Sales -> Details |
+| Reports | Today / week / month / custom period; filters; profit estimate with stated assumptions; print and CSV | Reports |
+| Staff and security | Cashier, manager, inventory, auditor roles; screen-lock PIN and idle lock; tamper-evident activity log; device name | Business setup |
+| Barcodes | Keyboard scanners anywhere on the till; camera scanning where the browser supports it; unknown barcode -> new product | Quick sale |
+| App | Installable (PNG icons), install button, update banner, sync backlog count, first-run set-up card | Always |
+
+More: `docs/ARCHITECTURE.md`, `OFFLINE_SYNC.md`, `DATA_MODEL.md`, `TESTING.md`, `TROUBLESHOOTING.md`, `DEPLOYMENT.md`, `FIREBASE_SETUP.md`, `API_DOCUMENTATION.md`, `MWAKETE_INTEGRATION.md`, `CHANGELOG.md` and the line-by-line `CAPABILITY_REGISTER.md`.
 
 Stock is counted **per device**, not shared between tills (see `SECURITY.md`). Credit notes, shifts, stock changes, suppliers, purchase orders and quotes sync only through a cloud account.
 

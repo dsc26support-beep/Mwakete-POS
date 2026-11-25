@@ -114,6 +114,10 @@ const FirebaseBackend = (() => {
         : undefined,
       unit: p.unit ? String(p.unit).slice(0, 12) : undefined,
       archived: p.archived === true ? true : undefined,
+      minQty: Number.isInteger(p.minQty) && p.minQty > 0 ? p.minQty : undefined,
+      qtyBreaks: Array.isArray(p.qtyBreaks)
+        ? p.qtyBreaks.slice(0, 5)
+        : undefined,
       priceHistory: Array.isArray(p.priceHistory)
         ? p.priceHistory.slice(-20)
         : undefined,
@@ -134,6 +138,8 @@ const FirebaseBackend = (() => {
     "unit",
     "archived",
     "priceHistory",
+    "minQty",
+    "qtyBreaks",
   ];
   // Decide what to change on this device after pulling the cloud catalogue.
   //  - new in the cloud -> add locally (stock is seeded from the cloud once)
@@ -395,6 +401,23 @@ const FirebaseBackend = (() => {
         import(CDN + "firebase-firestore.js"),
       ]);
       const app = appMod.initializeApp(FIREBASE_CONFIG);
+      // Optional App Check (reCAPTCHA v3). Off until a SITE key (public) is put in firebase-config.js; the secret key is
+      // never used here. A failure never blocks sign-in: until App Check is ENFORCED in the console it only adds a token.
+      if (
+        typeof FIREBASE_APPCHECK_SITE_KEY === "string" &&
+        FIREBASE_APPCHECK_SITE_KEY &&
+        !(typeof location !== "undefined" && location.hostname === "localhost")
+      ) {
+        try {
+          const ac = await import(CDN + "firebase-app-check.js");
+          ac.initializeAppCheck(app, {
+            provider: new ac.ReCaptchaV3Provider(FIREBASE_APPCHECK_SITE_KEY),
+            isTokenAutoRefreshEnabled: true,
+          });
+        } catch (_) {
+          /* App Check could not start; the app keeps working */
+        }
+      }
       auth = authMod.getAuth(app);
       db = fsMod.getFirestore(app); // default memory cache: no second offline store
       sdk = { authMod, fsMod };

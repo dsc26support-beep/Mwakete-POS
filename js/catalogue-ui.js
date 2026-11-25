@@ -138,6 +138,8 @@ const CatalogueUI = (() => {
     f.unit.value = p.unit || "each";
     f.description.value = p.description || "";
     f.archived.checked = !!p.archived;
+    f.qtyBreaks.value = K.breaksText(p.qtyBreaks);
+    f.minQty.value = p.minQty ?? "";
     f.clearImage.checked = false;
     f.imageFile.value = "";
     const h = (p.priceHistory || []).slice(-5).reverse();
@@ -172,6 +174,8 @@ const CatalogueUI = (() => {
       unit: f.unit.value,
       description: f.description.value,
       archived: f.archived.checked,
+      qtyBreaks: f.qtyBreaks.value,
+      minQty: f.minQty.value,
     };
     const r = K.applyEdit(editing, input);
     if (!r.ok) return toast(r.error);

@@ -12,4 +12,7 @@ const FIREBASE_CONFIG = {
   storageBucket: "mwakete-pos.firebasestorage.app",
   messagingSenderId: "648701661858",
 };
+/* OPTIONAL App Check. Paste the reCAPTCHA v3 SITE key (public) here to turn it on; leave empty to keep it off.
+ * Never paste the secret key. Turn on enforcement in the Firebase console only after testing with this set. */
+const FIREBASE_APPCHECK_SITE_KEY = "";
 if (typeof module !== "undefined") module.exports = FIREBASE_CONFIG;

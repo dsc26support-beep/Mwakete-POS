@@ -97,6 +97,24 @@ const InvoiceUI = (() => {
       toast("Choose a trade customer to sell on account.");
       return false;
     }
+    // Minimum trade quantity: a product can require a minimum for trade (account / trade-customer) sales.
+    if (mode === "account" || (customer && customer.type === "trade")) {
+      for (const l of cart) {
+        const p = await POSDB.get("products", l.productId || l.id);
+        const units = l.qty * (l.packUnits || 1);
+        if (p && p.minQty && units < p.minQty) {
+          toast(
+            p.name +
+              ": trade sales need at least " +
+              p.minQty +
+              " (this sale has " +
+              units +
+              ").",
+          );
+          return false;
+        }
+      }
+    }
     const rate = await taxRate();
     const lines = cart.map((l) => ({
       price: l.price,

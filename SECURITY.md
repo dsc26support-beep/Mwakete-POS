@@ -65,18 +65,28 @@ Before production:
 - **Rules audit:** the Firestore rules were audited against a red-team checklist. Fixed: unchecked invoice/discount/tax/tier types on a sale, an invoice total that could differ from its sale, a non-cash payment marked verified, back- or forward-dated records (limit: 7 days ahead of the server clock), and an unbounded staff ID length.
 - **Accessibility:** every screen in every business type, plus the dialogs, passes an automated WCAG 2.0/2.1 A and AA scan (axe), including colour contrast; dialogs trap and restore keyboard focus; clickable rows work with Tab, Enter and Space. Manual testing with a screen reader is still to do.
 
+## Roles, screen lock and activity log
+- **Roles (cloud rules):** `cashier`, `manager`, `inventory`, `auditor` (plus the owner). The owner chooses the role when adding staff and can change it later. Cashiers and managers can sell and refund; managers and inventory staff manage products, stock, suppliers and orders; managers also manage customers; managers and auditors read every record, cashiers only their own; inventory staff and auditors cannot sell; auditors cannot write anything; only the owner manages staff and the business record. Deactivating an account removes every right at once. 50 emulator tests cover this.
+- **Screen lock:** a 4 to 8 digit PIN stored as a salted, stretched (10,000 rounds) SHA-256 hash; simple PINs (1234, 1111) are refused; five wrong PINs force a 30 second wait; the app locks when reopened and after the chosen idle time. This protects against casual use. It cannot protect data from someone who controls the browser profile (IndexedDB is not encrypted).
+- **Activity log:** each device keeps a hash-chained log (sign-in/out, product edits, bulk changes, refunds, register open/close, backup restore, receipt sending, PIN and lock events). Editing or removing an entry is detected and shown as a warning. It is stored on the device, can be exported, is not synced to the cloud, and a person who wipes the browser data removes it.
+- **Receipt delivery:** the app never sends a message itself and stores no email, SMS or WhatsApp credentials. It opens the person's own app with the text filled in; "Delivered" only ever means the person confirmed it. Phone numbers and emails are validated and URL-encoded (no header injection). Only send a receipt to a customer who asked for it.
+- **Cost price and pictures** stay on the device and are refused by the cloud rules, so cashiers cannot read margins from the catalogue.
+- **Web API key** is limited to the two Hosting origins; **App Check** is optional and off.
+- **Mwakete adapter** is closed: it makes no network call and holds no secret (tested).
+
 ## Production blockers (the honest list)
 Do not rely on this app for real money without supervision until these are closed:
 1. **The server does not check totals.** Firestore rules cannot recompute a sale from its lines. Doing so needs Cloud Functions, which needs Firebase's paid plan; this project deliberately does not use it. A tampered device or a hostile cashier can store a wrong total or price.
 2. **No independent security review** of the rules, the app or the emulator-based tests.
 3. **No tax-law review** of invoice wording and rounding (12.5% on the discounted taxable amount, rounded half up once per invoice, per-product exemption).
-4. **No real-device pilot.** Not tested on real low-cost Android phones, barcode scanners or thermal printers. Camera barcode scanning and thermal printer drivers are not built (receipts use the browser's print).
-5. **No App Check** (needs a reCAPTCHA key from the Firebase console) and the web API key is **not yet restricted to the app's domains** (Google Cloud Console).
+4. **No real-device pilot.** Not tested on real low-cost Android phones, barcode scanners or thermal printers. Camera barcode scanning exists but was only tested with a faked camera; thermal printer drivers are not built (receipts use the browser's print).
+5. **App Check is not on.** The wiring exists and is off until a reCAPTCHA v3 **site** key is set in `firebase-config.js`; enforcement must be turned on in the console only after testing. The web API key **is now restricted** to `https://mwakete-pos.web.app/*` and `https://mwakete-pos.firebaseapp.com/*` (tested live; rollback in `docs/TROUBLESHOOTING.md`). A key restriction is not authentication: Firestore rules remain the real control.
 6. **Stock is not shared between devices.**
 7. **Digital payments are not verified.** A recorded card or mobile payment is only a record.
 8. **No Mwakete Marketplace integration.** The existing API contract was not available.
 9. **Local data is not encrypted at rest.** A lost or stolen device exposes what is stored on it. Use a device lock; sign out and clear site data on a lost device (an owner can also remove a cashier's access in the cloud).
 10. **Manual accessibility testing** with a screen reader, large text and the keyboard alone is still to do.
-11. **A throwaway test account** created during live testing remains in the Firebase project and should be deleted.
+11. **Roles stop at the rules, not at the screen.** A manager can change catalogue prices and customers by design; the activity log and screen lock are device-local and protect against casual misuse only (see "Roles, screen lock and activity log").
+12. *(closed)* The throwaway smoke-test account and its data were deleted; the project now has no test users.
 
 Report vulnerabilities privately to the repository owner. Do not publish exploit details before a fix is available.

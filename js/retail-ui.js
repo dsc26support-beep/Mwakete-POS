@@ -99,6 +99,20 @@ const RetailUI = (() => {
     sale.subtotal = t.subtotal;
     sale.total = t.total;
     if (t.discount) sale.discount = t.discount;
+    // A discount above the shop's limit needs the manager's approval PIN (when one is set).
+    if (
+      t.discount &&
+      t.subtotal > 0 &&
+      window.SecurityUI &&
+      !(await SecurityUI.approveIfNeeded(
+        "discount",
+        (t.discount.amount / t.subtotal) * 100,
+        "Discount of " +
+          Math.round((t.discount.amount / t.subtotal) * 1000) / 10 +
+          "%",
+      ))
+    )
+      return false;
     const cust = T.has(tier, "customers") ? $("saleCustomer").value : "";
     if (cust) sale.customerId = cust; // opaque local id only; the name never leaves the device
     sale.items = sale.items.map((it, i) =>

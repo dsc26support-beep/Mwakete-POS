@@ -152,6 +152,39 @@ test("bulk edits", () => {
   );
 });
 
+test("quantity discounts: parsing, ordering rules and pricing", () => {
+  const ok = K.parseBreaks("10:5\n50:10%");
+  assert.deepEqual(ok.value, [
+    { qty: 10, pct: 5 },
+    { qty: 50, pct: 10 },
+  ]);
+  assert.deepEqual(K.parseBreaks("").value, []);
+  assert.equal(K.parseBreaks("ten:5").ok, false);
+  assert.equal(K.parseBreaks("1:5").ok, false);
+  assert.equal(K.parseBreaks("10:0").ok, false);
+  assert.equal(K.parseBreaks("10:95").ok, false);
+  assert.equal(K.parseBreaks("10:5\n10:6").ok, false);
+  assert.equal(K.parseBreaks("10:8\n20:5").ok, false);
+  assert.equal(K.parseBreaks("2:1\n3:2\n4:3\n5:4\n6:5\n7:6").ok, false);
+  assert.equal(K.breaksText(ok.value), "10:5\n50:10");
+  assert.deepEqual(K.priceForQty(10, ok.value, 9), { price: 10, pct: 0 });
+  assert.deepEqual(K.priceForQty(10, ok.value, 10), { price: 9.5, pct: 5 });
+  assert.deepEqual(K.priceForQty(10, ok.value, 500), { price: 9, pct: 10 });
+  assert.deepEqual(K.priceForQty(3.33, ok.value, 10), { price: 3.16, pct: 5 });
+  assert.deepEqual(K.priceForQty(10, undefined, 99), { price: 10, pct: 0 });
+});
+
+test("minimum trade quantity and quantity discounts are saved and cleared by edits", () => {
+  const a = K.applyEdit(P(), { minQty: "12", qtyBreaks: "10:5" }, { now: 5 });
+  assert.equal(a.product.minQty, 12);
+  assert.deepEqual(a.product.qtyBreaks, [{ qty: 10, pct: 5 }]);
+  const b = K.applyEdit(a.product, { minQty: "", qtyBreaks: "" }, { now: 6 });
+  assert.equal("minQty" in b.product, false);
+  assert.equal("qtyBreaks" in b.product, false);
+  assert.equal(K.applyEdit(P(), { minQty: "2.5" }).ok, false);
+  assert.equal(K.applyEdit(P(), { qtyBreaks: "bad" }).ok, false);
+});
+
 test("thumbnail sizing and image validation", () => {
   assert.deepEqual(K.thumbSize(400, 200), { w: 96, h: 48 });
   assert.deepEqual(K.thumbSize(50, 40), { w: 50, h: 40 });

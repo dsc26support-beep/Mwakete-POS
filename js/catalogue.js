@@ -58,7 +58,84 @@
       }
     }
     if ("archived" in input) out.archived = !!input.archived;
+    if ("minQty" in input) {
+      const m = input.minQty;
+      if (m === "" || m === undefined || m === null || Number(m) === 0)
+        out.minQty = undefined;
+      else {
+        const n = Number(m);
+        if (!Number.isInteger(n) || n < 1 || n > 1e6)
+          return fail("Minimum trade quantity must be a whole number.");
+        out.minQty = n;
+      }
+    }
+    if ("qtyBreaks" in input) {
+      const b = parseBreaks(input.qtyBreaks);
+      if (!b.ok) return b;
+      out.qtyBreaks = b.value.length ? b.value : undefined;
+    }
     return { ok: true, fields: out };
+  }
+
+  /* Quantity discounts: text lines "10:5" = from 10 units, 5% off the unit price. Also accepts an array of {qty, pct}. */
+  const MAX_BREAKS = 5;
+  function parseBreaks(raw) {
+    let list;
+    if (Array.isArray(raw))
+      list = raw.map((b) => ({
+        qty: Number(b && b.qty),
+        pct: Number(b && b.pct),
+      }));
+    else {
+      list = [];
+      for (const line of String(raw == null ? "" : raw).split(/\r?\n|;/)) {
+        const t = line.trim();
+        if (!t) continue;
+        const m = /^(\d+)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%?$/.exec(t);
+        if (!m)
+          return fail(
+            'Write each quantity discount like "10:5" (from 10 units, 5% off).',
+          );
+        list.push({ qty: Number(m[1]), pct: Number(m[2]) });
+      }
+    }
+    if (list.length > MAX_BREAKS)
+      return fail("At most " + MAX_BREAKS + " quantity discounts.");
+    for (const b of list)
+      if (
+        !Number.isInteger(b.qty) ||
+        b.qty < 2 ||
+        b.qty > 1e6 ||
+        !(b.pct > 0) ||
+        b.pct > 90
+      )
+        return fail(
+          "A quantity discount needs 2 or more units and 0.1 to 90 percent.",
+        );
+    const sorted = list.slice().sort((a, b) => a.qty - b.qty);
+    for (let i = 1; i < sorted.length; i++)
+      if (sorted[i].qty === sorted[i - 1].qty)
+        return fail("Two quantity discounts start at the same quantity.");
+      else if (sorted[i].pct <= sorted[i - 1].pct)
+        return fail("A bigger quantity must give a bigger discount.");
+    return {
+      ok: true,
+      value: sorted.map((b) => ({
+        qty: b.qty,
+        pct: Math.round(b.pct * 10) / 10,
+      })),
+    };
+  }
+  const breaksText = (list) =>
+    (list || []).map((b) => b.qty + ":" + b.pct).join("\n");
+  /* Unit price for `qty` units, from the price the line starts at. Returns {price, pct}. */
+  function priceForQty(basePrice, breaks, qty) {
+    let pct = 0;
+    for (const b of breaks || []) if (qty >= b.qty) pct = b.pct;
+    return {
+      price: fromMinor(Math.round(toMinor(basePrice) * (1 - pct / 100))),
+      pct,
+    };
   }
 
   function addHistory(history, from, to, now, note) {
@@ -253,6 +330,10 @@
     addHistory,
     thumbSize,
     validImage,
+    parseBreaks,
+    breaksText,
+    priceForQty,
+    MAX_BREAKS,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CatalogueCore = api;

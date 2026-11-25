@@ -292,6 +292,13 @@ const server = http.createServer((req, res) => {
     document.getElementById("scanPanel").classList.add("hidden"),
   );
   await page.evaluate(() =>
+    document.getElementById("approvePanel").classList.remove("hidden"),
+  );
+  await scan("manager approval dialog");
+  await page.evaluate(() =>
+    document.getElementById("approvePanel").classList.add("hidden"),
+  );
+  await page.evaluate(() =>
     document.getElementById("lockScreen").classList.remove("hidden"),
   );
   await scan("lock screen");

@@ -31,6 +31,9 @@
     unlock: "Screen unlocked",
     "unlock-failed": "Wrong PIN",
     "discount-override": "Discount approved",
+    "refund-override": "Refund approved",
+    "approval-set": "Approval PIN or limits changed",
+    "approval-failed": "Approval refused",
   };
   const hex = (buf) =>
     [...new Uint8Array(buf)]
@@ -179,6 +182,37 @@
   const waitSeconds = (state, now = Date.now()) =>
     Math.max(0, Math.ceil((((state && state.lockedUntil) || 0) - now) / 1000));
 
+  /* ---------- manager approval ---------- */
+  /* limits: {discountPct, refundAmount}; 0 or missing = no limit. kind: "discount" (value in percent) | "refund" (amount). */
+  function needsApproval(kind, value, limits) {
+    const lim =
+      Number(
+        limits && limits[kind === "discount" ? "discountPct" : "refundAmount"],
+      ) || 0;
+    return lim > 0 && Number(value) > lim;
+  }
+  function validLimits(input) {
+    const d =
+      input.discountPct === "" || input.discountPct == null
+        ? 0
+        : Number(input.discountPct);
+    const r =
+      input.refundAmount === "" || input.refundAmount == null
+        ? 0
+        : Number(input.refundAmount);
+    if (!Number.isFinite(d) || d < 0 || d > 100)
+      return {
+        ok: false,
+        error: "The discount limit must be 0 to 100 percent.",
+      };
+    if (!Number.isFinite(r) || r < 0 || r > 1e9)
+      return { ok: false, error: "The refund limit must be zero or more." };
+    return {
+      ok: true,
+      value: { discountPct: d, refundAmount: Math.round(r * 100) / 100 },
+    };
+  }
+
   /* ---------- idle + device ---------- */
   const IDLE_CHOICES = [0, 1, 2, 5, 10, 15, 30];
   const idleDue = (lastActive, minutes, now = Date.now()) =>
@@ -209,6 +243,8 @@
     idleDue,
     deviceName,
     sha256,
+    needsApproval,
+    validLimits,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SecurityCore = api;

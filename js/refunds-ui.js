@@ -98,6 +98,16 @@ const RefundsUI = (() => {
         refunds,
       });
       if (!r.ok) return toast(r.error);
+      // A refund above the shop's limit needs the manager's approval PIN (when one is set).
+      if (
+        window.SecurityUI &&
+        !(await SecurityUI.approveIfNeeded(
+          "refund",
+          r.value.total,
+          "Refund of " + fmt(r.value.total),
+        ))
+      )
+        return;
       // Saved before anything else, so a refund is never lost; stock follows.
       await POSDB.put("refunds", r.value);
       if (window.Audit)

@@ -123,6 +123,74 @@ const SecurityUI = (() => {
     }
   }
 
+  /* ---------- manager approval ---------- */
+  let apin = null; // approval PIN record
+  let limits = { discountPct: 0, refundAmount: 0 };
+  let afail = { fails: 0, lockedUntil: 0 };
+  const exempt = () =>
+    typeof FirebaseBackend !== "undefined" &&
+    FirebaseBackend.isSignedIn() &&
+    ["owner", "manager"].includes(FirebaseBackend.staffRole());
+
+  /* Resolves true when no approval is needed or the right PIN is entered; false if cancelled. */
+  function approveIfNeeded(kind, value, reason) {
+    if (!apin || exempt() || !S.needsApproval(kind, value, limits))
+      return Promise.resolve(true);
+    return new Promise((resolve) => {
+      $("approveReason").textContent =
+        reason + " is above the limit. A manager must approve it.";
+      $("approveError").textContent = "";
+      $("approvePin").value = "";
+      $("approvePanel").classList.remove("hidden");
+      $("approvePin").focus();
+      const done = (ok) => {
+        $("approvePanel").classList.add("hidden");
+        $("approveForm").removeEventListener("submit", onSubmit);
+        $("approveCancel").removeEventListener("click", onCancel);
+        if (ok)
+          logEntry(
+            kind === "discount" ? "discount-override" : "refund-override",
+            reason,
+          );
+        resolve(ok);
+      };
+      const onCancel = () => done(false);
+      const onSubmit = async (e) => {
+        e.preventDefault();
+        const wait = S.waitSeconds(afail);
+        if (wait > 0) {
+          $("approveError").textContent =
+            "Too many wrong PINs. Wait " + wait + " seconds.";
+          return;
+        }
+        const good = await S.checkPin(apin, $("approvePin").value);
+        afail = S.afterAttempt(afail, good);
+        await put("approvalFail", afail);
+        if (good) return done(true);
+        logEntry("approval-failed", reason);
+        $("approvePin").value = "";
+        $("approveError").textContent =
+          S.waitSeconds(afail) > 0
+            ? "Too many wrong PINs. Wait " + S.waitSeconds(afail) + " seconds."
+            : "That PIN is not right.";
+      };
+      $("approveForm").addEventListener("submit", onSubmit);
+      $("approveCancel").addEventListener("click", onCancel);
+    });
+  }
+  function renderApprovalState() {
+    const f = $("approvalForm").elements;
+    f.discountPct.value = limits.discountPct;
+    f.refundAmount.value = limits.refundAmount;
+    $("approvalState").textContent = apin
+      ? "Approval is on: discounts above " +
+        (limits.discountPct || "no limit") +
+        "% and refunds above " +
+        (limits.refundAmount || "no limit") +
+        " need the PIN."
+      : "No approval PIN is set, so nothing needs approval.";
+  }
+
   /* ---------- setup forms ---------- */
   function renderPinState() {
     $("pinState").textContent = pin
@@ -166,6 +234,50 @@ const SecurityUI = (() => {
     await renderDevice();
     await checkLog();
 
+    apin = (await setting("approvalPin")) || null;
+    limits = (await setting("approvalLimits")) || limits;
+    afail = (await setting("approvalFail")) || afail;
+    renderApprovalState();
+    $("approvalForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.currentTarget.elements; // read before awaiting
+      const lim = S.validLimits({
+        discountPct: f.discountPct.value,
+        refundAmount: f.refundAmount.value,
+      });
+      if (!lim.ok) return toast(lim.error);
+      const entered = f.pin.value;
+      if (entered) {
+        const m = await S.makePin(entered);
+        if (!m.ok) return toast(m.error);
+        apin = m.record;
+        await put("approvalPin", apin);
+        f.pin.value = "";
+      } else if (!apin && (lim.value.discountPct || lim.value.refundAmount)) {
+        return toast("Set an approval PIN first.");
+      }
+      limits = lim.value;
+      await put("approvalLimits", limits);
+      logEntry(
+        "approval-set",
+        "discount " + limits.discountPct + "%, refund " + limits.refundAmount,
+      );
+      renderApprovalState();
+      toast("Approval settings saved.");
+    });
+    $("approvalClear").addEventListener("click", async () => {
+      if (!apin) return toast("No approval PIN is set.");
+      if (
+        !confirm(
+          "Remove the approval PIN? Discounts and refunds will no longer need approval.",
+        )
+      )
+        return;
+      apin = null;
+      await POSDB.remove("settings", "approvalPin");
+      logEntry("approval-set", "removed");
+      renderApprovalState();
+    });
     $("auditText").addEventListener("input", renderLog);
     $("auditAction").addEventListener("input", renderLog);
     $("auditExport").addEventListener("click", () => {
@@ -257,6 +369,12 @@ const SecurityUI = (() => {
     if (pin) lock("app opened");
   }
   window.Audit = { log: logEntry };
-  return { init, lock, render: renderDevice, isLocked: () => locked };
+  return {
+    init,
+    lock,
+    render: renderDevice,
+    isLocked: () => locked,
+    approveIfNeeded,
+  };
 })();
 if (typeof window !== "undefined") window.SecurityUI = SecurityUI;

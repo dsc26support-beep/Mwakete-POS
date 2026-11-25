@@ -37,6 +37,16 @@ const MAX_GRID = 150, // product cards drawn at the till
   MAX_ROWS = 200, // rows drawn in the product list
   MAX_SALES = 100; // sales drawn in the history
 const MAX_QTY = 9999; // most of one item in a single sale
+/* Quantity discounts: the line keeps the price it started at (basePrice); the unit price follows the quantity. */
+function repriceLine(line) {
+  const p = products.find((x) => x.id === (line.productId || line.id));
+  if (!p || !p.qtyBreaks || !p.qtyBreaks.length || line.packId) return;
+  if (line.basePrice === undefined) line.basePrice = line.price;
+  const r = CatalogueCore.priceForQty(line.basePrice, p.qtyBreaks, line.qty);
+  line.price = r.price;
+  if (r.pct) line.breakPct = r.pct;
+  else delete line.breakPct;
+}
 // Stock counts live on each device and can be out of date, so this warns and never blocks a sale.
 function stockWarn(p, line) {
   if (!p || !line) return;
@@ -70,12 +80,13 @@ function renderProducts() {
   if (window.WholesaleUI) WholesaleUI.afterProducts();
 }
 function renderCart() {
+  cart.forEach(repriceLine);
   $("cartCount").textContent = cart.reduce((n, x) => n + x.qty, 0);
   $("cartItems").innerHTML = cart.length
     ? cart
         .map(
           (x) =>
-            `<div class="cart-line"><div><strong>${esc(x.name)}</strong><small>${money(x.price)} × ${x.qty}</small></div><div class="qty"><button data-dec="${x.id}" aria-label="Decrease">−</button><b>${money(x.price * x.qty)}</b><button data-inc="${x.id}" aria-label="Increase">+</button></div></div>`,
+            `<div class="cart-line"><div><strong>${esc(x.name)}</strong><small>${money(x.price)} × ${x.qty}${x.breakPct ? " (" + x.breakPct + "% quantity discount)" : ""}</small></div><div class="qty"><button data-dec="${x.id}" aria-label="Decrease">−</button><b>${money(x.price * x.qty)}</b><button data-inc="${x.id}" aria-label="Increase">+</button></div></div>`,
         )
         .join("")
     : '<p class="empty">Your cart is empty.</p>';
@@ -113,6 +124,7 @@ function saveDraft() {
       listId: x.listId || "",
       ...(x.packId ? { packId: x.packId, packUnits: x.packUnits } : {}),
       ...(x.taxExempt ? { taxExempt: true } : {}),
+      ...(x.basePrice !== undefined ? { basePrice: x.basePrice } : {}),
     }));
     Promise.resolve(POSDB.put("settings", { key: "cartDraft", value })).catch(
       () => {},
@@ -418,6 +430,7 @@ window.addEventListener("offline", connection);
   await ScanUI.init();
   await PwaUI.init();
   await OnboardingUI.init();
+  await MwaketeUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

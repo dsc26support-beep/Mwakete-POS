@@ -9,9 +9,13 @@ rules_version = '2';
 //
 // Roles
 //   owner   : the signed-in user whose uid equals the business ID. Full access.
-//   cashier : a verified user with an ACTIVE document at businesses/{id}/staff/{uid}
-//             (created by the owner). Can sell and read the catalogue; cannot edit
-//             products, customers or staff, and sees only their own sales/payments.
+//   staff   : a verified user with an ACTIVE document at businesses/{id}/staff/{uid}
+//             (created by the owner) whose role is one of:
+//             cashier   sells and refunds; reads the catalogue; sees only their own records
+//             manager   as cashier, plus products, customers, stock, suppliers, orders; reads all records
+//             inventory products, stock, suppliers, orders; cannot sell
+//             auditor   reads all records; writes nothing
+//             Only the owner manages staff and the business record.
 //
 // Collection: businesses
 // Document ID: {ownerUid}
@@ -268,7 +272,7 @@ service cloud.firestore {
     function validProduct(productId) {
       let d = request.resource.data;
       return d.keys().hasAll(['id', 'name', 'price', 'updatedAt'])
-        && d.keys().hasOnly(['id', 'name', 'price', 'stock', 'sku', 'category', 'reorderLevel', 'prices', 'packs', 'taxExempt', 'description', 'unit', 'archived', 'priceHistory', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'name', 'price', 'stock', 'sku', 'category', 'reorderLevel', 'prices', 'packs', 'taxExempt', 'description', 'unit', 'archived', 'priceHistory', 'minQty', 'qtyBreaks', 'updatedAt'])
         && d.id == productId
         && isShortString(d.id, 64)
         && isShortString(d.name, 100)
@@ -284,7 +288,9 @@ service cloud.firestore {
         && (!('description' in d) || (d.description is string && d.description.size() <= 300))
         && (!('unit' in d) || (d.unit is string && d.unit.size() <= 12))
         && (!('archived' in d) || d.archived is bool)
-        && (!('priceHistory' in d) || (d.priceHistory is list && d.priceHistory.size() <= 20));
+        && (!('priceHistory' in d) || (d.priceHistory is list && d.priceHistory.size() <= 20))
+        && (!('minQty' in d) || (d.minQty is int && d.minQty >= 1 && d.minQty <= 1000000))
+        && (!('qtyBreaks' in d) || (d.qtyBreaks is list && d.qtyBreaks.size() <= 5));
     }
 
     function isShortOptional(d, key, maxLen) {
