@@ -17,6 +17,8 @@ goal: Close every PDF capability (POS-001..172, M, N), free only, all tests gree
 - Tests last run green: unit 353, browser 19 suites, rules 50, cloud e2e, axe 0. Live sign-in + CSP check ok.
 - Housekeeping done: smoke-test account + data deleted (Auth now empty); web API key limited to the 2 Hosting origins (rollback: set browserKeyRestrictions to {}); API Keys API was enabled (free) to do it; App Check wired but off.
 
+- Final report delivered to user; PR #1 body updated with scope, results, blockers. Nothing else pending unless user asks.
+
 ## decisions
 - Free only: receipt delivery via mailto/sms/wa.me + local queue; Delivered = user-confirmed.
 - costPrice + images device-only; stock per device; stock warn-not-block.
