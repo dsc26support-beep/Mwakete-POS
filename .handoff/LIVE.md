@@ -1,38 +1,31 @@
 # Handoff (live) — Mwakete POS + Firebase
 
 ## Goal
-Free 3-tier POS (Counter/Retail/Wholesale) for Kiribati. Firebase backend: Email/Password Auth + Firestore. Project `mwakete-pos`.
-User wants Firebase agent skills used for all Firebase work. Skills/agents now loaded: firebase:firestore-rules-author (subagent), firebase:firebase-security-rules-auditor.
-User standing orders: keep going without stopping, consult only when absolutely necessary; may create branches/PRs on own.
+Free offline-first 3-tier POS (Counter/Retail/Wholesale) for Kiribati. Firebase Auth (Email/Password) + Firestore, project `mwakete-pos`. User wants Firebase agent skills used; work continuously, ask only when essential.
+Full handoff: .handoff/20261125-0830-firebase-pos-complete.md (also Drive: Claude Handoffs/mwakete-pos).
 
-## State (done, verified, deployed)
-- Web app 1:648701661858:web:e96059c73228e578d43dfb (Android app ...android:a415bbcc... untouched).
-- Auth Email/Password on. Firestore Standard, australia-southeast1. Rules + Hosting deployed. Live: https://mwakete-pos.web.app
-- Verified email REQUIRED (rules + app). Roles: owner (bizId = uid) and cashier (active doc businesses/{id}/staff/{uid}). Sales/payments carry staffUid (rules enforce = writer). Cashier reads only own records; cannot write products/customers/staff.
-- Product sync: owner pushes dirty products (updatedAt > cloudSyncedAt), all pull, LWW, stock per device (seeded only when new), tombstones for deletes (settings key productTombstones). Trade customers pulled to cashiers, never overwrite local.
-- Code: js/integrations/firebase.js (+firebase-config.js public IDs), js/cloud-ui.js, js/sync.js (applyCloud), js/app.js (tombstone on delete).
-- Tests all pass: npm test 167; tests/rules 25 (emulator, cd tests/rules && npm test); tests/e2e/firebase-cloud.e2e.js (owner+cashier vs Auth+Firestore emulators; ?emulator=1 on localhost only).
-- PR #1 (draft) dsc26support-beep/mwakete-pos -> main, branch claude/pensive-curie-l1iir1, subscribed to events. main was created from 10235b7 with user's permission.
+## State
+- ALL buildable roadmap features done, tested, deployed (https://mwakete-pos.web.app). Rules audited+hardened, deployed.
+- Tests green: unit 267; browser x10; rules emulator 41; cloud owner+cashier e2e; axe 0 violations; live smoke ok.
+- PR #1 (draft) dsc26support-beep/mwakete-pos <- claude/pensive-curie-l1iir1; main created from 10235b7 (user OK). Subscribed to PR events.
+- User asked "links and steps": given in chat for (1) delete smoke-test account + its Firestore business doc, (2) restrict API key to web.app/firebaseapp.com (Identity Toolkit, Token Service, Cloud Firestore APIs), (3) App Check reCAPTCHA v3 site key (send SITE key only, do not enforce yet), (4) Marketplace API docs.
 
-## Next steps (proposed to user, awaiting "go")
-1. Run firebase-security-rules-auditor / firestore-rules-author on firestore.rules (rules were hand-written before those loaded).
-2. Wholesale PR3 purchase orders, PR4 quotes/delivery notes, refunds/credit notes/void, payment allocation, statements.
-3. Stock ledger, cloud reports, register open/close, CSV import, offline hardening, accessibility.
-4. App Check (needs reCAPTCHA key from user).
+## Next steps
+1. Wait for user: App Check site key -> wire initializeAppCheck + ReCaptchaV3Provider in js/integrations/firebase.js load(); test; user then enforces in console; update SECURITY.md.
+2. Wait for Marketplace API docs -> read first; keep tenant data separate; never break marketplace backend.
+3. Supervised pilot on real phones/scanners/printers; fix findings.
+4. Later: camera barcode, thermal printer, shared stock, independent security + tax-law review.
 
-## Decisions / why
-- Standard not Enterprise (free quota); Sydney region (closest to Kiribati, immutable).
-- Cloud sign-in optional (CLAUDE.md offline-first, IndexedDB = queue). Synced only after Firestore confirms; re-send idempotent (identical doc rule).
-- Stock not synced: avoids multi-till overwrite.
-- Server-side total checks need Cloud Functions = Blaze billing. Asked user yes/no; default = no, owner app trusted for prices (documented).
+## Decisions (why)
+- Standard Firestore, Sydney (free quota, nearest, immutable). No Blaze/Functions (user said no) => server can't verify totals; documented blocker.
+- Stock per device; cashiers see only own records; staff deactivated not deleted; cloud optional.
+- Backup never restores deviceCode/seq counters/cloud link (no duplicate invoice numbers).
 
 ## Gotchas
-- Bash hook: <=10 statements, <=500 chars, no inline python/heredoc scripts; use Write tool + Edit.
-- Formatter hook rewrites files after Write; Read before editing if needed.
-- e2e run: NODE_PATH=$(npm root -g) npx -y firebase-tools@latest emulators:exec --only auth,firestore --project mwakete-pos "node tests/e2e/firebase-cloud.e2e.js"
-- e.currentTarget is null after await (fixed in cloud-ui).
-- Env mwakete-pos (env_01PVna8f56ygeMpw2TPk9Nyw) allowlist: Firebase hosts, mwakete-pos.web.app, www.gstatic.com.
+- Bash hook: <=10 statements, <=500 chars, no heredocs/inline scripts. Formatter rewrites files after Write: Read before Edit.
+- e.currentTarget null after await. Playwright waitForFunction + async predicate is always true.
+- Cloud e2e: NODE_PATH=$(npm root -g) npx -y firebase-tools@latest emulators:exec --only auth,firestore --project mwakete-pos "node tests/e2e/firebase-cloud.e2e.js"
+- CLI logged in as admin@mwakete.com; env mwakete-pos allowlists Firebase hosts.
 
-## Open questions / user todo
-- Delete test account mwakete.smoketest.1795582984250@example.com + its Firestore business doc.
-- Blaze/Functions yes or no; Mwakete marketplace API docs + test env; tax 12.5% and invoice wording; API key domain restriction; App Check key; Android packaging (package name + signing key); real-device pilot (scanners/printers).
+## Open questions
+- Marketplace API contract + test env? Android packaging (package name + signing key)? Tax 12.5% / invoice wording reviewed by adviser?
