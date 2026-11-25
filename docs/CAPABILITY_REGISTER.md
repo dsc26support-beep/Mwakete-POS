@@ -128,7 +128,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
 | POS-096 | Generate receipt | Verified | |
-| POS-097 | Receipt number | Missing | sales show an ID prefix; invoices have INV numbers |
+| POS-097 | Receipt number | Verified | R-<device>-<seq> on every new sale, shown on receipts (js/txn.js; tests/txn.test.js; e2e/txn) |
 | POS-098 | Receipt formatting | Verified | 32-column text |
 | POS-099 | Print receipt | Partial | browser print only; no thermal-printer driver |
 | POS-100 | Digital receipt | Partial | copy as text |
@@ -147,15 +147,15 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
 | POS-111 | Transaction history | Verified | |
-| POS-112 | Transaction search | Missing | |
-| POS-113 | Transaction filtering | Missing | |
-| POS-114 | View transaction details | Partial | receipt view |
-| POS-115 | Transaction status | Partial | sync status and refunded note |
-| POS-116 | Transaction export | Missing | |
-| POS-117 | Transaction audit history | Missing | |
-| POS-118 | Transaction cancellation controls | Partial | |
-| POS-119 | Transaction correction workflow | Partial | credit notes |
-| POS-120 | Transaction integrity checks | Partial | |
+| POS-112 | Transaction search | Verified | search by receipt, product, payment reference (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-113 | Transaction filtering | Verified | filters: dates, payment method, status (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-114 | View transaction details | Verified | details dialog (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-115 | Transaction status | Verified | Completed / Partly or Fully refunded / On account / Not accepted by the cloud (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-116 | Transaction export | Verified | CSV export of the filtered list, formulas neutralised (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-117 | Transaction audit history | Partial | history is derived from the sale and its credit notes; no separate immutable log yet (batch 6) |
+| POS-118 | Transaction cancellation controls | Partial | a sale cannot be edited or deleted; cancel = full refund (credit note) |
+| POS-119 | Transaction correction workflow | Partial | correction = refund + new sale; explained in the details dialog; no guided wizard |
+| POS-120 | Transaction integrity checks | Verified | TxnCore.checkIntegrity re-adds lines, discount and payments (js/txn.js; tests/txn.test.js; e2e/txn) |
 
 ## I. Returns and refunds
 | ID | Capability | Status | Evidence / gap |

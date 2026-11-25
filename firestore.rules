@@ -189,6 +189,7 @@ service cloud.firestore {
         && (!('tax' in d) || isMoney(d.tax))
         && (!('syncStatus' in d) || (d.syncStatus is string && d.syncStatus.size() <= 20))
         && (!('discount' in d) || validDiscount(d.discount))
+        && (!('receiptNo' in d) || isShortString(d.receiptNo, 30))
         && (!('tendered' in d) || isMoney(d.tendered))
         && (!('change' in d) || isMoney(d.change))
         && (!('payments' in d) || validPayments(d))

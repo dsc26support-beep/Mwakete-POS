@@ -32,6 +32,8 @@ const BackupCore = (() => {
   const SKIP_SETTINGS = new Set([
     "deviceCode",
     "invoiceSeq",
+    "receiptSeq",
+    "heldSales",
     "creditSeq",
     "poSeq",
     "quoteSeq",

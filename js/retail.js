@@ -200,7 +200,10 @@ const RetailCore = (() => {
     const cur = sale.currency || "";
     const lines = [
       String(business || "Mwakete POS"),
-      "Receipt: " + sale.id,
+      "Receipt: " +
+        (sale.receiptNo
+          ? sale.receiptNo + " (" + sale.id.slice(0, 8) + ")"
+          : sale.id),
       "Date: " + fmtDate(sale.createdAt),
     ];
     if (customer?.name) lines.push("Customer: " + customer.name);

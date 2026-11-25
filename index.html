@@ -148,7 +148,17 @@
       </div>
     </section>
     <section id="view-sales" class="view hidden">
-      <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div><div id="salesList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div>
+        <div class="filter-row" role="search">
+          <input id="txnText" type="search" placeholder="Search receipt, product, reference" aria-label="Search sales">
+          <input id="txnFrom" type="date" aria-label="From date">
+          <input id="txnTo" type="date" aria-label="To date">
+          <select id="txnMethod" aria-label="Payment method"><option value="">Any payment</option><option value="cash">Cash</option><option value="eftpos">EFTPOS / card</option><option value="internet_banking">Internet banking</option><option value="mpaisa">M-PAiSA</option><option value="other">Other</option><option value="account">On account</option></select>
+          <select id="txnStatus" aria-label="Status"><option value="">Any status</option><option>Completed</option><option>Partly refunded</option><option>Fully refunded</option><option>On account</option><option>Not accepted by the cloud</option></select>
+        </div>
+        <p id="txnSummary" class="hint" role="status"></p>
+        <div class="row-actions"><button id="txnExport" class="button secondary" type="button">Export sales (CSV)</button></div>
+        <div id="salesList"></div></div>
       <div class="panel hidden" data-feature="refunds"><div class="section-heading"><div><p class="eyebrow">CREDIT NOTES</p><h2>Refunds and returns</h2></div></div><p class="hint">Open a sale and press <strong>Refund…</strong>. A refund never changes the original sale; it is recorded as a credit note. Credit notes reach your cloud account when you are signed in.</p><div id="refundsList"></div></div>
     </section>
     <section id="view-register" class="view hidden">
@@ -481,6 +491,13 @@
       </form>
     </div>
   </div>
+  <div id="txnPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="txnTitle">
+    <div class="modal-card">
+      <h3 id="txnTitle">Sale details</h3>
+      <div id="txnBody"></div>
+      <div class="modal-actions"><button class="button primary" type="button" id="txnClose">Close</button></div>
+    </div>
+  </div>
   <div id="heldPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="heldTitle">
     <div class="modal-card">
       <h3 id="heldTitle">Held sales</h3>
@@ -503,6 +520,7 @@
   <script src="./js/cloud-ui.js"></script>
   <script src="./js/checkout.js"></script>
   <script src="./js/catalogue.js"></script>
+  <script src="./js/txn.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -520,6 +538,7 @@
   <script src="./js/invoices-ui.js"></script>
   <script src="./js/checkout-ui.js"></script>
   <script src="./js/catalogue-ui.js"></script>
+  <script src="./js/txn-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>

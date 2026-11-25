@@ -169,9 +169,11 @@ const eq = (a, b, msg) => {
     );
   await page.click(".product-card");
   await page.click("#checkout");
-  await page.waitForFunction(
-    async () => (await POSDB.all("sales")).length === 2,
-  );
+  // poll from Node: an async predicate passed to waitForFunction is always truthy
+  for (let i = 0; i < 50; i++) {
+    if ((await page.evaluate(() => POSDB.all("sales"))).length === 2) break;
+    await page.waitForTimeout(100);
+  }
   d = await dump();
   const counterSale = d.s.find((x) => x.id !== "old-s");
   eq(
@@ -185,6 +187,7 @@ const eq = (a, b, msg) => {
       "paymentMethod",
       "paymentVerified",
       "payments",
+      "receiptNo",
       "syncStatus",
       "tendered",
       "total",

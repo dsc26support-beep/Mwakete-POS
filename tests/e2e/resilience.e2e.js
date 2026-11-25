@@ -347,7 +347,7 @@ const eq = (a, b, m) => {
     "the sales history draws the newest 100",
   );
   ok(
-    /Showing the newest 100 of 30\d\d sales/.test(await text("#salesList")),
+    /Showing the newest 100 of 30\d\d matching sales/.test(await text("#salesList")),
     "with a note about the rest",
   );
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });

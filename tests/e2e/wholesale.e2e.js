@@ -510,7 +510,7 @@ const eq = (a, b, m) => {
   );
 
   console.log("Offline reload");
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1500);
   await ctx.setOffline(true);
   await page.reload();
   await page.waitForSelector("#productGrid .product-card");

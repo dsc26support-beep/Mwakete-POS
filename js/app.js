@@ -146,6 +146,7 @@ function renderProductTable() {
     : '<p class="empty">No products added yet.</p>';
 }
 async function renderSales() {
+  if (window.TxnUI) return TxnUI.render();
   const sales = (await POSDB.all("sales")).sort(
     (a, b) => b.createdAt - a.createdAt,
   );
@@ -313,6 +314,7 @@ $("checkout").addEventListener("click", async () => {
     };
   if (window.RetailUI && !(await RetailUI.decorateSale(sale, cart))) return;
   if (window.CheckoutUI && !CheckoutUI.apply(sale)) return;
+  if (window.TxnCore) sale.receiptNo = await TxnCore.nextReceiptNumber(POSDB);
   await POSDB.put("sales", sale);
   for (const line of cart) {
     const p = products.find((x) => x.id === (line.productId || line.id));
@@ -323,7 +325,7 @@ $("checkout").addEventListener("click", async () => {
   }
   cart = [];
   await refresh();
-  toast("Sale saved. Receipt ID: " + sale.id);
+  toast("Sale saved. Receipt: " + (sale.receiptNo || sale.id));
   if (window.CheckoutUI) CheckoutUI.afterSale(sale);
   if (window.RetailUI) RetailUI.afterSale(sale);
   if (window.QuotesUI) await QuotesUI.afterSale(sale);
@@ -393,6 +395,7 @@ window.addEventListener("offline", connection);
     render: renderCart,
   });
   await CatalogueUI.init();
+  await TxnUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();
