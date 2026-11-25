@@ -780,6 +780,507 @@ test("products: other users and anonymous cannot read or write the catalogue", a
   );
 });
 
+/* ---------- refunds (credit notes) ---------- */
+const refundDoc = (id, by = OWNER, over = {}) => ({
+  id,
+  staffUid: by,
+  saleId: "s1",
+  number: "CN-AB12-1",
+  createdAt: 1700000000002,
+  currency: "AUD",
+  method: "cash",
+  items: [
+    {
+      lineIndex: 0,
+      productId: "p1",
+      name: "Water",
+      unitPrice: 2.5,
+      quantity: 1,
+    },
+  ],
+  tax: 0,
+  total: 2.5,
+  restock: true,
+  syncStatus: "pending",
+  ...over,
+});
+// Seed (rules bypassed) a plain sale s1 (total 5), an invoice on account i1 (customer c1) and a paid invoice i2.
+async function seedSales() {
+  await seed();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const d = ctx.firestore();
+    await setDoc(doc(d, "businesses", OWNER, "sales", "s1"), sale("s1", OWNER));
+    await setDoc(
+      doc(d, "businesses", OWNER, "sales", "i1"),
+      invoiceSale("i1", OWNER),
+    );
+    await setDoc(
+      doc(d, "businesses", OWNER, "sales", "c-sale"),
+      sale("c-sale", CASHIER),
+    );
+    await setDoc(doc(d, "businesses", OWNER, "sales", "i2"), {
+      ...invoiceSale("i2", OWNER),
+      paymentMethod: "cash",
+      paymentVerified: true,
+      invoice: { ...invoiceSale("i2").invoice, mode: "paid" },
+    });
+  });
+}
+const colDoc = (uid, col, id) => ref(db(uid), "businesses", OWNER, col, id);
+
+test("refunds: a credit note against an existing sale is accepted, idempotent, append-only", async () => {
+  await seedSales();
+  await assertSucceeds(setDoc(colDoc(OWNER, "refunds", "r1"), refundDoc("r1")));
+  await assertSucceeds(setDoc(colDoc(OWNER, "refunds", "r1"), refundDoc("r1")));
+  await assertFails(
+    setDoc(
+      colDoc(OWNER, "refunds", "r1"),
+      refundDoc("r1", OWNER, { total: 1 }),
+    ),
+  );
+  await assertFails(deleteDoc(colDoc(OWNER, "refunds", "r1")));
+});
+
+test("refunds: never larger than the sale, and the sale must exist", async () => {
+  await seedSales();
+  await assertSucceeds(
+    setDoc(
+      colDoc(OWNER, "refunds", "r1"),
+      refundDoc("r1", OWNER, { total: 5 }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      colDoc(OWNER, "refunds", "r2"),
+      refundDoc("r2", OWNER, { total: 5.01 }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      colDoc(OWNER, "refunds", "r3"),
+      refundDoc("r3", OWNER, { saleId: "ghost" }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      colDoc(OWNER, "refunds", "r4"),
+      refundDoc("r4", OWNER, { total: 0 }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      colDoc(OWNER, "refunds", "r5"),
+      refundDoc("r5", OWNER, { total: -2 }),
+    ),
+  );
+});
+
+test("refunds: invalid or unexpected fields are refused", async () => {
+  await seedSales();
+  const w = (id, over) =>
+    setDoc(colDoc(OWNER, "refunds", id), refundDoc(id, OWNER, over));
+  await assertFails(w("x1", { method: "bitcoin" }));
+  await assertFails(w("x2", { items: [] }));
+  await assertFails(w("x3", { secret: "x" }));
+  await assertFails(w("x4", { number: "" }));
+  await assertFails(w("x5", { reason: "r".repeat(201) }));
+  await assertFails(w("x6", { createdAt: Date.now() + 30 * 86400000 }));
+  await assertFails(w("x7", { restock: "yes" }));
+  await assertFails(
+    setDoc(colDoc(OWNER, "refunds", "x8"), refundDoc("other-id")),
+  );
+  await assertSucceeds(w("ok", { reason: "Wrong size" }));
+});
+
+test("refunds: credit to an account needs an invoice on account for that same customer", async () => {
+  await seedSales();
+  const acct = (id, over) =>
+    setDoc(
+      colDoc(OWNER, "refunds", id),
+      refundDoc(id, OWNER, {
+        method: "account",
+        saleId: "i1",
+        customerId: "c1",
+        total: 50,
+        invoiceNumber: "INV-A1-1",
+        ...over,
+      }),
+    );
+  await assertSucceeds(acct("a1", {}));
+  await assertFails(acct("a2", { customerId: "someone-else" }));
+  const { customerId, ...none } = refundDoc("a3", OWNER, {
+    method: "account",
+    saleId: "i1",
+    total: 50,
+  });
+  await assertFails(setDoc(colDoc(OWNER, "refunds", "a3"), none));
+  await assertFails(acct("a4", { saleId: "s1" })); // a plain sale has no account
+  await assertFails(acct("a5", { saleId: "i2" })); // a paid invoice is not on account
+  await assertFails(acct("a6", { total: 112.51 })); // over the invoice total
+});
+
+test("refunds: a cashier can record one, sees only their own, and cannot impersonate", async () => {
+  await seedSales();
+  await assertSucceeds(
+    setDoc(
+      colDoc(CASHIER, "refunds", "cr1"),
+      refundDoc("cr1", CASHIER, { saleId: "c-sale" }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      colDoc(CASHIER, "refunds", "cr2"),
+      refundDoc("cr2", OWNER, { saleId: "c-sale" }),
+    ),
+  );
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(
+      doc(ctx.firestore(), "businesses", OWNER, "staff", CASHIER2),
+      staff(CASHIER2),
+    );
+    await setDoc(
+      doc(ctx.firestore(), "businesses", OWNER, "refunds", "or1"),
+      refundDoc("or1", OWNER),
+    );
+  });
+  await assertSucceeds(getDoc(colDoc(CASHIER, "refunds", "cr1")));
+  await assertFails(getDoc(colDoc(CASHIER, "refunds", "or1")));
+  await assertFails(getDoc(colDoc(CASHIER2, "refunds", "cr1")));
+  await assertSucceeds(getDoc(colDoc(OWNER, "refunds", "cr1")));
+  await assertFails(
+    setDoc(colDoc(OTHER, "refunds", "z1"), refundDoc("z1", OTHER)),
+  );
+  await assertFails(
+    setDoc(colDoc(null, "refunds", "z2"), refundDoc("z2", OWNER)),
+  );
+});
+
+/* ---------- register shifts ---------- */
+const shift = (id, by = OWNER, over = {}) => ({
+  id,
+  staffUid: by,
+  openedAt: 1700000000000,
+  closedAt: 1700000600000,
+  openingFloat: 50,
+  countedCash: 120.5,
+  expectedCash: 120,
+  difference: 0.5,
+  salesCount: 7,
+  cashSales: 70.5,
+  cashRefunds: 0,
+  cashPayments: 0,
+  currency: "AUD",
+  syncStatus: "pending",
+  ...over,
+});
+
+test("registers: a closed shift is accepted, immutable, and validated", async () => {
+  await seed();
+  const w = (uid, id, data) => setDoc(colDoc(uid, "registers", id), data);
+  await assertSucceeds(w(OWNER, "g1", shift("g1")));
+  await assertSucceeds(w(OWNER, "g1", shift("g1")));
+  await assertFails(w(OWNER, "g1", shift("g1", OWNER, { countedCash: 1 })));
+  await assertFails(deleteDoc(colDoc(OWNER, "registers", "g1")));
+  await assertSucceeds(w(CASHIER, "g2", shift("g2", CASHIER)));
+  await assertFails(w(CASHIER, "g3", shift("g3", OWNER)));
+  await assertFails(
+    w(OWNER, "g4", shift("g4", OWNER, { closedAt: 1700000000000 - 1 })),
+  );
+  await assertFails(w(OWNER, "g5", shift("g5", OWNER, { countedCash: -1 })));
+  await assertFails(w(OWNER, "g6", shift("g6", OWNER, { salesCount: 1.5 })));
+  await assertFails(w(OWNER, "g7", shift("g7", OWNER, { difference: "0" })));
+  await assertFails(w(OWNER, "g8", shift("g8", OWNER, { extra: 1 })));
+  await assertFails(w(OTHER, "g9", shift("g9", OTHER)));
+  await assertSucceeds(getDoc(colDoc(CASHIER, "registers", "g2")));
+  await assertFails(getDoc(colDoc(CASHIER, "registers", "g1")));
+});
+
+/* ---------- stock movements ---------- */
+const move = (id, by = OWNER, over = {}) => ({
+  id,
+  staffUid: by,
+  productId: "p1",
+  productName: "Water",
+  delta: 24,
+  reason: "purchase",
+  refId: "po1",
+  createdAt: 1700000000000,
+  syncStatus: "pending",
+  ...over,
+});
+
+test("stockMoves: append-only audit trail with a sensible delta and a known reason", async () => {
+  await seed();
+  const w = (uid, id, data) => setDoc(colDoc(uid, "stockMoves", id), data);
+  await assertSucceeds(w(OWNER, "m1", move("m1")));
+  await assertSucceeds(w(OWNER, "m1", move("m1")));
+  await assertFails(w(OWNER, "m1", move("m1", OWNER, { delta: 25 })));
+  await assertFails(deleteDoc(colDoc(OWNER, "stockMoves", "m1")));
+  await assertSucceeds(
+    w(OWNER, "m2", move("m2", OWNER, { delta: -3, reason: "damage" })),
+  );
+  await assertSucceeds(
+    w(CASHIER, "m3", move("m3", CASHIER, { reason: "count", delta: -1 })),
+  );
+  await assertFails(w(OWNER, "m4", move("m4", OWNER, { delta: 0 })));
+  await assertFails(w(OWNER, "m5", move("m5", OWNER, { delta: 2e9 })));
+  await assertFails(w(OWNER, "m6", move("m6", OWNER, { reason: "gift" })));
+  await assertFails(w(OWNER, "m7", move("m7", OWNER, { productId: "" })));
+  await assertFails(w(OWNER, "m8", move("m8", OWNER, { delta: "5" })));
+  await assertFails(w(CASHIER, "m9", move("m9", OWNER)));
+  await assertFails(w(OTHER, "m10", move("m10", OTHER)));
+});
+
+/* ---------- suppliers and purchase orders (owner only) ---------- */
+const supplier = (id, over = {}) => ({
+  id,
+  staffUid: OWNER,
+  name: "Pacific Traders",
+  phone: "+686 12345",
+  updatedAt: 1700000000000,
+  syncStatus: "pending",
+  ...over,
+});
+const po = (id, over = {}) => ({
+  id,
+  staffUid: OWNER,
+  number: "PO-AB12-1",
+  supplierId: "sup1",
+  supplierName: "Pacific Traders",
+  status: "draft",
+  items: [{ productId: "p1", name: "Water", qty: 24, unitCost: 1.2 }],
+  total: 28.8,
+  currency: "AUD",
+  createdAt: 1700000000000,
+  updatedAt: 1700000000000,
+  syncStatus: "pending",
+  ...over,
+});
+
+test("suppliers: only the owner, and an older version cannot overwrite a newer one", async () => {
+  await seed();
+  const w = (uid, id, data) => setDoc(colDoc(uid, "suppliers", id), data);
+  await assertSucceeds(w(OWNER, "sup1", supplier("sup1")));
+  await assertSucceeds(
+    w(
+      OWNER,
+      "sup1",
+      supplier("sup1", {
+        name: "Pacific Traders Ltd",
+        updatedAt: 1700000005000,
+      }),
+    ),
+  );
+  await assertFails(
+    w(
+      OWNER,
+      "sup1",
+      supplier("sup1", { name: "Old", updatedAt: 1700000001000 }),
+    ),
+  );
+  await assertFails(w(OWNER, "sup2", supplier("sup2", { name: "" })));
+  await assertFails(w(OWNER, "sup3", supplier("sup3", { extra: 1 })));
+  await assertFails(deleteDoc(colDoc(OWNER, "suppliers", "sup1")));
+  await assertFails(
+    w(CASHIER, "sup4", supplier("sup4", { staffUid: CASHIER })),
+  );
+  await assertFails(getDoc(colDoc(CASHIER, "suppliers", "sup1")));
+  await assertFails(getDoc(colDoc(OTHER, "suppliers", "sup1")));
+  await assertSucceeds(getDoc(colDoc(OWNER, "suppliers", "sup1")));
+});
+
+test("purchaseOrders: draft -> ordered -> received, then frozen; cashiers cannot see or write them", async () => {
+  await seed();
+  const w = (uid, id, data) => setDoc(colDoc(uid, "purchaseOrders", id), data);
+  await assertSucceeds(w(OWNER, "po1", po("po1")));
+  await assertSucceeds(
+    w(OWNER, "po1", po("po1", { status: "ordered", updatedAt: 1700000001000 })),
+  );
+  await assertFails(
+    w(
+      OWNER,
+      "po1",
+      po("po1", { status: "received", updatedAt: 1700000002000 }),
+    ),
+  ); // needs receivedAt
+  await assertSucceeds(
+    w(
+      OWNER,
+      "po1",
+      po("po1", {
+        status: "received",
+        receivedAt: 1700000002000,
+        updatedAt: 1700000002000,
+      }),
+    ),
+  );
+  await assertSucceeds(
+    w(
+      OWNER,
+      "po1",
+      po("po1", {
+        status: "received",
+        receivedAt: 1700000002000,
+        updatedAt: 1700000002000,
+      }),
+    ),
+  ); // identical re-send
+  await assertFails(
+    w(
+      OWNER,
+      "po1",
+      po("po1", {
+        status: "received",
+        receivedAt: 1700000002000,
+        updatedAt: 1700000003000,
+        total: 1,
+      }),
+    ),
+  );
+  await assertFails(
+    w(OWNER, "po1", po("po1", { status: "draft", updatedAt: 1700000009000 })),
+  );
+  await assertFails(w(OWNER, "po2", po("po2", { items: [] })));
+  await assertFails(w(OWNER, "po3", po("po3", { total: -1 })));
+  await assertFails(w(OWNER, "po4", po("po4", { status: "shipped" })));
+  await assertSucceeds(w(OWNER, "po5", po("po5")));
+  await assertFails(
+    w(
+      OWNER,
+      "po5",
+      po("po5", {
+        status: "ordered",
+        createdAt: 1700000000500,
+        updatedAt: 1700000001000,
+      }),
+    ),
+  );
+  await assertFails(w(OWNER, "po5", po("po5", { updatedAt: 1699999999000 })));
+  await assertFails(deleteDoc(colDoc(OWNER, "purchaseOrders", "po5")));
+  await assertFails(w(CASHIER, "po6", po("po6", { staffUid: CASHIER })));
+  await assertFails(getDoc(colDoc(CASHIER, "purchaseOrders", "po1")));
+});
+
+/* ---------- quotes ---------- */
+const quote = (id, by = CASHIER, over = {}) => ({
+  id,
+  staffUid: by,
+  number: "QT-AB12-1",
+  customerId: "c1",
+  customerName: "Trade Co",
+  status: "open",
+  items: [{ productId: "p1", name: "Water", unitPrice: 2.5, quantity: 10 }],
+  subtotal: 25,
+  tax: 3.13,
+  total: 28.13,
+  currency: "AUD",
+  createdAt: 1700000000000,
+  updatedAt: 1700000000000,
+  syncStatus: "pending",
+  ...over,
+});
+
+test("quotes: a member writes their own, edits it while open, and it freezes once converted", async () => {
+  await seed();
+  const w = (uid, id, data) => setDoc(colDoc(uid, "quotes", id), data);
+  await assertSucceeds(w(CASHIER, "q1", quote("q1")));
+  await assertSucceeds(
+    w(
+      CASHIER,
+      "q1",
+      quote("q1", CASHIER, { note: "Revised", updatedAt: 1700000001000 }),
+    ),
+  );
+  await assertFails(
+    w(
+      CASHIER,
+      "q1",
+      quote("q1", CASHIER, { createdAt: 5, updatedAt: 1700000002000 }),
+    ),
+  );
+  await assertFails(
+    w(CASHIER, "q1", quote("q1", CASHIER, { updatedAt: 1699999990000 })),
+  );
+  await assertFails(
+    w(CASHIER, "q1", quote("q1", OWNER, { updatedAt: 1700000002000 })),
+  ); // cannot change the author
+  await assertFails(
+    w(
+      CASHIER,
+      "q2",
+      quote("q2", CASHIER, { status: "converted", updatedAt: 1700000001000 }),
+    ),
+  ); // needs convertedSaleId
+  await assertSucceeds(
+    w(
+      CASHIER,
+      "q1",
+      quote("q1", CASHIER, {
+        status: "converted",
+        convertedSaleId: "s1",
+        updatedAt: 1700000003000,
+      }),
+    ),
+  );
+  await assertSucceeds(
+    w(
+      CASHIER,
+      "q1",
+      quote("q1", CASHIER, {
+        status: "converted",
+        convertedSaleId: "s1",
+        updatedAt: 1700000003000,
+      }),
+    ),
+  ); // identical
+  await assertFails(
+    w(
+      CASHIER,
+      "q1",
+      quote("q1", CASHIER, { status: "open", updatedAt: 1700000009000 }),
+    ),
+  );
+  await assertFails(deleteDoc(colDoc(CASHIER, "quotes", "q1")));
+});
+
+test("quotes: other cashiers cannot read or change them; the owner can read and update an open one", async () => {
+  await seed();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(
+      doc(ctx.firestore(), "businesses", OWNER, "staff", CASHIER2),
+      staff(CASHIER2),
+    );
+  });
+  await assertSucceeds(setDoc(colDoc(CASHIER, "quotes", "q1"), quote("q1")));
+  await assertFails(getDoc(colDoc(CASHIER2, "quotes", "q1")));
+  await assertFails(
+    setDoc(
+      colDoc(CASHIER2, "quotes", "q1"),
+      quote("q1", CASHIER, { note: "hijack", updatedAt: 1700000001000 }),
+    ),
+  );
+  await assertSucceeds(getDoc(colDoc(OWNER, "quotes", "q1")));
+  await assertSucceeds(
+    setDoc(
+      colDoc(OWNER, "quotes", "q1"),
+      quote("q1", CASHIER, { note: "Owner edit", updatedAt: 1700000001000 }),
+    ),
+  );
+  await assertFails(setDoc(colDoc(OTHER, "quotes", "q9"), quote("q9", OTHER)));
+  await assertFails(
+    setDoc(
+      colDoc(CASHIER, "quotes", "q8"),
+      quote("q8", CASHIER, { total: -1 }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      colDoc(CASHIER, "quotes", "q7"),
+      quote("q7", CASHIER, { status: "won" }),
+    ),
+  );
+});
+
 /* ---------- default deny ---------- */
 test("default deny: unknown collections are closed to everyone", async () => {
   await assertFails(setDoc(ref(db(OWNER), "anything", "x"), { a: 1 }));

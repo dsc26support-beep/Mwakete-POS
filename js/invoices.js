@@ -167,7 +167,8 @@ const InvoiceCore = (() => {
   const isOpen = (r) =>
     r.syncStatus !== "synced" && r.syncStatus !== "rejected";
   // Amount (major units) this device has recorded but the ledger has not confirmed yet: pending account invoices minus pending payments.
-  function pendingBalance(sales, payments, customerId) {
+  // Credit notes sent to the customer's account (refunds with method "account") reduce it too.
+  function pendingBalance(sales, payments, customerId, refunds) {
     let m = 0;
     for (const s of sales || [])
       if (
@@ -179,6 +180,9 @@ const InvoiceCore = (() => {
         m += toMinor(s.invoice.total);
     for (const p of payments || [])
       if (p.customerId === customerId && isOpen(p)) m -= toMinor(p.amount);
+    for (const r of refunds || [])
+      if (r.method === "account" && r.customerId === customerId && isOpen(r))
+        m -= toMinor(r.total);
     return fromMinor(m);
   }
   // creditLimit undefined/null = no limit set (no check). 0 = no credit allowed.

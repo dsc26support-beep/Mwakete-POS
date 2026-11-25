@@ -71,11 +71,19 @@ async function renderSales() {
   const sales = (await POSDB.all("sales")).sort(
     (a, b) => b.createdAt - a.createdAt,
   );
+  const refunds =
+    typeof RefundCore !== "undefined" ? await POSDB.all("refunds") : [];
+  const refundedText = (s) => {
+    const m = refunds.length
+      ? RefundCore.refundedSoFar(refunds, s.id).minor
+      : 0;
+    return m > 0 ? " · refunded " + money(m / 100) : "";
+  };
   $("salesList").innerHTML = sales.length
     ? sales
         .map(
           (s) =>
-            `<div class="sale-row" data-sale-id="${esc(s.id)}"><div><strong>${esc(s.id.slice(0, 18))}</strong><small>${new Date(s.createdAt).toLocaleString()} · ${s.paymentMethod} · ${s.syncStatus}</small></div><strong>${money(s.total)}</strong></div>`,
+            `<div class="sale-row" data-sale-id="${esc(s.id)}"><div><strong>${esc(s.id.slice(0, 18))}</strong><small>${new Date(s.createdAt).toLocaleString()} · ${s.paymentMethod} · ${s.syncStatus}${refundedText(s)}</small></div><strong>${money(s.total)}</strong></div>`,
         )
         .join("")
     : '<p class="empty">No sales recorded yet.</p>';
@@ -276,6 +284,7 @@ window.addEventListener("offline", connection);
   await RetailUI.init();
   await WholesaleUI.init();
   await InvoiceUI.init();
+  await RefundsUI.init();
   await HelpCentre.init();
   await CloudUI.init();
   connection();

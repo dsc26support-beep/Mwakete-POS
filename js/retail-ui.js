@@ -129,6 +129,18 @@ const RetailUI = (() => {
         ? await InvoiceUI.textFor(sale)
         : R.buildReceiptText(sale, name?.value || "Mwakete POS", cust);
     $("receiptBody").innerHTML = R.receiptHtml(lastReceipt);
+    $("receiptPanel").dataset.saleId = sale.id;
+    if ($("receiptRefund")) $("receiptRefund").hidden = false;
+    $("receiptPanel").classList.remove("hidden");
+    $("receiptClose").focus();
+  }
+
+  // Shows any 32-column document (for example a credit note) in the same viewer. No refund button on it.
+  function showText(text) {
+    lastReceipt = text;
+    $("receiptBody").innerHTML = R.receiptHtml(text);
+    $("receiptPanel").dataset.saleId = "";
+    if ($("receiptRefund")) $("receiptRefund").hidden = true;
     $("receiptPanel").classList.remove("hidden");
     $("receiptClose").focus();
   }
@@ -223,7 +235,16 @@ const RetailUI = (() => {
     });
     await render();
   }
-  return { init, render, afterCart, decorateSale, afterSale, productExtras };
+  return {
+    init,
+    render,
+    afterCart,
+    decorateSale,
+    afterSale,
+    productExtras,
+    showText,
+    showReceipt,
+  };
 })();
 // `const` in a classic script is not a window property; app.js checks window.RetailUI before calling the hooks.
 window.RetailUI = RetailUI;

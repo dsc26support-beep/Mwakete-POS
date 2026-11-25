@@ -94,6 +94,7 @@
     </section>
     <section id="view-sales" class="view hidden">
       <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div><div id="salesList"></div></div>
+      <div class="panel hidden" data-feature="refunds"><div class="section-heading"><div><p class="eyebrow">CREDIT NOTES</p><h2>Refunds and returns</h2></div></div><p class="hint">Open a sale and press <strong>Refund…</strong>. A refund never changes the original sale; it is recorded as a credit note. Credit notes reach your cloud account when you are signed in.</p><div id="refundsList"></div></div>
     </section>
     <section id="view-customers" class="view hidden">
       <div class="panel">
@@ -271,10 +272,24 @@
     </section>
     <footer>© <span id="year"></span> Mwakete POS · Built for businesses in Kiribati</footer>
   </main>
+  <div id="refundPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="refundTitle">
+    <div class="modal-card">
+      <h3 id="refundTitle">Refund or return</h3>
+      <p id="refundSale" class="muted"></p>
+      <form id="refundForm" class="settings-form">
+        <div id="refundLines"></div>
+        <label>Return the money as<select name="method" id="refundMethod"></select></label>
+        <label>Reason (optional)<input name="reason" maxlength="200" placeholder="For example: wrong size"></label>
+        <label class="check"><input type="checkbox" name="restock" checked> Put the returned items back in stock on this device</label>
+        <p id="refundTotal" class="muted" role="status" aria-live="polite"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="refundCancel">Cancel</button><button class="button primary" type="submit" id="refundConfirm">Record refund</button></div>
+      </form>
+    </div>
+  </div>
   <div id="receiptPanel" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt">
     <div class="modal-card">
       <div id="receiptBody"></div>
-      <div class="modal-actions"><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
+      <div class="modal-actions"><button id="receiptRefund" class="button secondary" type="button" data-feature="refunds" hidden>Refund…</button><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
     </div>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -284,6 +299,7 @@
   <script src="./js/integrations/firebase-config.js"></script>
   <script src="./js/integrations/firebase.js"></script>
   <script src="./js/cloud-ui.js"></script>
+  <script src="./js/refunds.js"></script>
   <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
@@ -291,6 +307,7 @@
   <script src="./js/wholesale.js"></script>
   <script src="./js/wholesale-ui.js"></script>
   <script src="./js/invoices-ui.js"></script>
+  <script src="./js/refunds-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>

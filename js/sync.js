@@ -23,6 +23,13 @@ const POSSynchroniser = {
       const productDeletes = owner
         ? (await POSDB.get("settings", "productTombstones"))?.value || []
         : [];
+      // Credit notes, shifts, stock movements, purchase orders and quotes (cloud account only).
+      const extra = {};
+      if (useFirebase)
+        for (const store of EXTRA_STORES) {
+          const recs = (await POSDB.all(store)).filter(open);
+          if (recs.length) extra[store] = recs;
+        }
       // A signed-in cloud account always syncs, even with nothing pending, so the catalogue is pulled.
       if (!useFirebase && !sales.length && !payments.length) {
         const rejected =
@@ -73,7 +80,7 @@ const POSSynchroniser = {
         customers,
         business,
         ...(useFirebase
-          ? { products, productDeletes: productDeletes.map((t) => t.id) }
+          ? { products, productDeletes: productDeletes.map((t) => t.id), extra }
           : {}),
       });
       if (!result || !Array.isArray(result.acceptedIds))
@@ -95,10 +102,18 @@ const POSSynchroniser = {
       const cloud = useFirebase
         ? await applyCloud(result, products, productDeletes)
         : null;
+      const more = useFirebase
+        ? await applyExtra(result, extra)
+        : { synced: 0, rejected: 0 };
       const synced =
         changes.sales.filter((s) => s.syncStatus === "synced").length +
-        changes.payments.filter((p) => p.syncStatus === "synced").length;
-      const rej = changes.sales.length + changes.payments.length - synced;
+        changes.payments.filter((p) => p.syncStatus === "synced").length +
+        more.synced;
+      const rej =
+        changes.sales.length +
+        changes.payments.length -
+        (synced - more.synced) +
+        more.rejected;
       if (rej)
         setSyncUI(
           "Sync needs attention",
@@ -132,6 +147,50 @@ const POSSynchroniser = {
     }
   },
 };
+// Record kinds besides sales and payments that sync to the cloud account (one local store each).
+const EXTRA_STORES = [
+  "refunds",
+  "registers",
+  "stockMoves",
+  "suppliers",
+  "purchaseOrders",
+  "quotes",
+];
+/* Mark a record synced ONLY if the server returned its id; a refused one keeps the reason and is flagged.
+ * A record edited while the sync was running (its updatedAt changed) is left pending, so no edit is lost. */
+async function applyExtra(result, extra) {
+  const rej = new Map(
+    (result.rejected || []).map((r) => [
+      String(r.id),
+      String(r.reason || "Rejected by the cloud").slice(0, 200),
+    ]),
+  );
+  let synced = 0,
+    rejected = 0;
+  for (const [store, recs] of Object.entries(extra)) {
+    const acc = new Set((result.acceptedExtra || {})[store] || []);
+    for (const r of recs) {
+      const isAcc = acc.has(r.id),
+        isRej = !isAcc && rej.has(r.id);
+      if (!isAcc && !isRej) continue;
+      const cur = await POSDB.get(store, r.id);
+      if (cur && (cur.updatedAt || 0) !== (r.updatedAt || 0)) continue;
+      const { syncError, ...rest } = r;
+      if (isAcc) {
+        await POSDB.put(store, { ...rest, syncStatus: "synced" });
+        synced++;
+      } else {
+        await POSDB.put(store, {
+          ...rest,
+          syncStatus: "rejected",
+          syncError: rej.get(r.id),
+        });
+        rejected++;
+      }
+    }
+  }
+  return { synced, rejected };
+}
 /* Apply what the cloud confirmed. Local products are marked cloudSyncedAt ONLY for ids the server accepted;
  * a product removal tombstone is cleared ONLY when the server confirmed the delete. */
 async function applyCloud(result, sentProducts, sentDeletes) {

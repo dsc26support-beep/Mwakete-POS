@@ -18,6 +18,16 @@ const FirebaseBackend = (() => {
   const SDK_VERSION = "11.10.0";
   const CDN = "https://www.gstatic.com/firebasejs/" + SDK_VERSION + "/";
   const WRITE_TIMEOUT_MS = 20000;
+  // Record kinds that sync through payload.extra (one Firestore collection each). The owner alone writes some.
+  const EXTRA_KINDS = [
+    "refunds",
+    "registers",
+    "stockMoves",
+    "suppliers",
+    "purchaseOrders",
+    "quotes",
+  ];
+  const OWNER_ONLY_KINDS = ["suppliers", "purchaseOrders"];
   let sdk = null,
     auth = null,
     db = null,
@@ -35,12 +45,14 @@ const FirebaseBackend = (() => {
   }
   const cents = (n) => Math.round(Number(n || 0) * 100);
   // Balance owed by a customer = invoices on account minus payments, in integer cents.
-  function computeBalance(sales, payments) {
+  // Credit notes with method "account" reduce it as well.
+  function computeBalance(sales, payments, refunds = []) {
     let c = 0;
     for (const s of sales)
       if (s.invoice && s.invoice.mode === "account")
         c += cents(s.invoice.total);
     for (const p of payments) c -= cents(p.amount);
+    for (const r of refunds) if (r.method === "account") c -= cents(r.total);
     return c / 100;
   }
   function friendlyAuthError(e) {
@@ -158,6 +170,7 @@ const FirebaseBackend = (() => {
       acceptedPaymentIds = [],
       acceptedProducts = [],
       deletedProductIds = [],
+      acceptedExtra = {},
       rejected = [],
       rejectedProducts = [];
     let transient = 0,
@@ -236,6 +249,15 @@ const FirebaseBackend = (() => {
       await write("payments", { ...p, staffUid: uid }, (id) =>
         acceptedPaymentIds.push(id),
       );
+    // Credit notes, register shifts, stock movements, purchase orders, quotes (always AFTER the sales they refer to).
+    // Owner-only kinds are skipped on a cashier device (the rules would refuse them anyway).
+    for (const [sub, records] of Object.entries(payload.extra || {})) {
+      if (!EXTRA_KINDS.includes(sub)) continue;
+      if (role === "cashier" && OWNER_ONLY_KINDS.includes(sub)) continue;
+      const ok = (acceptedExtra[sub] = []);
+      for (const rec of records || [])
+        await write(sub, { ...rec, staffUid: uid }, (id) => ok.push(id));
+    }
 
     if (attempted && transient && !done)
       throw new Error(
@@ -265,10 +287,13 @@ const FirebaseBackend = (() => {
           .filter((s) => s.invoice && s.customerId)
           .map((s) => s.customerId),
         ...(payload.payments || []).map((p) => p.customerId),
+        ...((payload.extra && payload.extra.refunds) || [])
+          .filter((r) => r.method === "account" && r.customerId)
+          .map((r) => r.customerId),
       ]);
       for (const id of ids) {
         try {
-          const [ss, ps] = await Promise.all([
+          const [ss, ps, rs] = await Promise.all([
             fs.getDocs(
               fs.query(
                 fs.collection(dbRef, ...base, "sales"),
@@ -281,10 +306,17 @@ const FirebaseBackend = (() => {
                 fs.where("customerId", "==", id),
               ),
             ),
+            fs.getDocs(
+              fs.query(
+                fs.collection(dbRef, ...base, "refunds"),
+                fs.where("customerId", "==", id),
+              ),
+            ),
           ]);
           balances[id] = computeBalance(
             ss.docs.map((d) => d.data()),
             ps.docs.map((d) => d.data()),
+            rs.docs.map((d) => d.data()),
           );
         } catch (_) {
           /* balance stays unconfirmed; the app shows it as pending */
@@ -295,6 +327,7 @@ const FirebaseBackend = (() => {
       ok: true,
       acceptedIds,
       acceptedPaymentIds,
+      acceptedExtra,
       rejected,
       balances,
       acceptedProducts,

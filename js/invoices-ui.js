@@ -35,11 +35,12 @@ const InvoiceUI = (() => {
     tier = await T.getTier(POSDB);
     syncPaymentOption();
     if (!on()) return;
-    const [customers, sales, payments, bal] = await Promise.all([
+    const [customers, sales, payments, bal, refunds] = await Promise.all([
       POSDB.all("customers"),
       POSDB.all("sales"),
       POSDB.all("payments"),
       POSDB.get("settings", "balances"),
+      POSDB.all("refunds"),
     ]);
     const balances = bal?.value || {};
     const trade = customers
@@ -51,7 +52,7 @@ const InvoiceUI = (() => {
             I.accountRow(
               c,
               balances[c.id]?.amount ?? 0,
-              I.pendingBalance(sales, payments, c.id),
+              I.pendingBalance(sales, payments, c.id, refunds),
               c.creditLimit,
               balances[c.id]?.at,
             ),
@@ -113,15 +114,16 @@ const InvoiceUI = (() => {
       return false;
     }
     if (mode === "account") {
-      const [sales, payments, bal] = await Promise.all([
+      const [sales, payments, bal, refunds] = await Promise.all([
         POSDB.all("sales"),
         POSDB.all("payments"),
         POSDB.get("settings", "balances"),
+        POSDB.all("refunds"),
       ]);
       const known = bal?.value?.[customer.id];
       const o = I.overLimit({
         confirmed: known?.amount ?? 0,
-        pending: I.pendingBalance(sales, payments, customer.id),
+        pending: I.pendingBalance(sales, payments, customer.id, refunds),
         invoiceTotal: t.total,
         creditLimit: customer.creditLimit,
       });

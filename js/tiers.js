@@ -12,6 +12,9 @@ const TierCore = (() => {
     "categories",
     "reports",
     "lowStock",
+    "refunds",
+    "register",
+    "stock",
   ];
   // Each Wholesale PR turns on only what it ships. Declared-but-off (PR 3-4): purchaseOrders, quotes.
   const WHOLESALE_ONLY = [

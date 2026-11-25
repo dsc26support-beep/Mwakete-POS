@@ -236,6 +236,153 @@ service cloud.firestore {
         && (!('taxExempt' in d) || d.taxExempt is bool);
     }
 
+    function isShortOptional(d, key, maxLen) {
+      return !(key in d) || (d[key] is string && d[key].size() <= maxLen);
+    }
+
+    function validItemList(items) {
+      return items is list && items.size() >= 1 && items.size() <= 200;
+    }
+
+    // A credit note against a sale that already exists in this business. It can never be larger than that
+    // sale, and a credit to a customer's account only against an invoice on account for that customer.
+    // (Rules cannot add up several credit notes: the app tracks what is left, and the owner can audit.)
+    function validRefund(businessId, refundId) {
+      let d = request.resource.data;
+      let salePath = /databases/$(database)/documents/businesses/$(businessId)/sales/$(d.saleId);
+      return d.keys().hasAll(['id', 'staffUid', 'saleId', 'number', 'createdAt', 'items', 'total', 'method'])
+        && d.keys().hasOnly(['id', 'staffUid', 'saleId', 'number', 'createdAt', 'items', 'total', 'method', 'tax', 'currency', 'restock', 'reason', 'customerId', 'invoiceNumber', 'syncStatus'])
+        && d.id == refundId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.saleId, 64)
+        && isShortString(d.number, 64)
+        && validTime(d.createdAt)
+        && validItemList(d.items)
+        && d.total is number && d.total > 0 && d.total <= 1000000000
+        && d.method in ['cash', 'account', 'other']
+        && (!('tax' in d) || isMoney(d.tax))
+        && (!('restock' in d) || d.restock is bool)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'reason', 200)
+        && isShortOptional(d, 'invoiceNumber', 64)
+        && isShortOptional(d, 'syncStatus', 20)
+        && exists(salePath)
+        && d.total <= get(salePath).data.total
+        && (d.method != 'account'
+            || ('customerId' in d
+                && isShortString(d.customerId, 64)
+                && get(salePath).data.invoice.mode == 'account'
+                && get(salePath).data.customerId == d.customerId));
+    }
+
+    // A closed cash-drawer shift. Append-only.
+    function validRegister(registerId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'openedAt', 'closedAt', 'openingFloat', 'countedCash', 'expectedCash', 'difference', 'salesCount'])
+        && d.keys().hasOnly(['id', 'staffUid', 'openedAt', 'closedAt', 'openingFloat', 'countedCash', 'expectedCash', 'difference', 'salesCount', 'cashSales', 'cashRefunds', 'cashPayments', 'note', 'currency', 'syncStatus'])
+        && d.id == registerId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && validTime(d.openedAt)
+        && validTime(d.closedAt)
+        && d.closedAt >= d.openedAt
+        && isMoney(d.openingFloat)
+        && isMoney(d.countedCash)
+        && isMoney(d.expectedCash)
+        && d.difference is number && d.difference >= -1000000000 && d.difference <= 1000000000
+        && d.salesCount is int && d.salesCount >= 0 && d.salesCount <= 10000000
+        && (!('cashSales' in d) || isMoney(d.cashSales))
+        && (!('cashRefunds' in d) || isMoney(d.cashRefunds))
+        && (!('cashPayments' in d) || isMoney(d.cashPayments))
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    // One stock movement (receiving, adjustment, stock-take, damage, return). Append-only.
+    function validStockMove(moveId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'productId', 'delta', 'reason', 'createdAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'productId', 'productName', 'delta', 'reason', 'createdAt', 'refId', 'note', 'syncStatus'])
+        && d.id == moveId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.productId, 64)
+        && d.delta is number && d.delta != 0 && d.delta >= -1000000000 && d.delta <= 1000000000
+        && d.reason in ['purchase', 'adjustment', 'count', 'damage', 'return', 'correction']
+        && validTime(d.createdAt)
+        && isShortOptional(d, 'productName', 100)
+        && isShortOptional(d, 'refId', 64)
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    function validSupplier(supplierId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'name', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'name', 'phone', 'note', 'archived', 'updatedAt', 'syncStatus'])
+        && d.id == supplierId
+        && isShortString(d.id, 64)
+        && isShortString(d.name, 100)
+        && validTime(d.updatedAt)
+        && isShortOptional(d, 'phone', 40)
+        && isShortOptional(d, 'note', 200)
+        && (!('archived' in d) || d.archived is bool)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    function validPurchaseOrder(orderId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'number', 'supplierName', 'status', 'items', 'total', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'number', 'supplierId', 'supplierName', 'status', 'items', 'total', 'currency', 'createdAt', 'updatedAt', 'receivedAt', 'note', 'syncStatus'])
+        && d.id == orderId
+        && isShortString(d.id, 64)
+        && isShortString(d.number, 64)
+        && isShortString(d.supplierName, 100)
+        && d.status in ['draft', 'ordered', 'received', 'cancelled']
+        && validItemList(d.items)
+        && isMoney(d.total)
+        && validTime(d.createdAt)
+        && validTime(d.updatedAt)
+        && (!('receivedAt' in d) || validTime(d.receivedAt))
+        && (d.status != 'received' || 'receivedAt' in d)
+        && isShortOptional(d, 'supplierId', 64)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    function validQuote(quoteId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'number', 'customerName', 'status', 'items', 'total', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'number', 'customerId', 'customerName', 'status', 'items', 'subtotal', 'tax', 'total', 'currency', 'createdAt', 'updatedAt', 'validUntil', 'convertedSaleId', 'note', 'syncStatus'])
+        && d.id == quoteId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.number, 64)
+        && isShortString(d.customerName, 100)
+        && d.status in ['open', 'converted', 'declined', 'expired']
+        && validItemList(d.items)
+        && isMoney(d.total)
+        && (!('subtotal' in d) || isMoney(d.subtotal))
+        && (!('tax' in d) || isMoney(d.tax))
+        && validTime(d.createdAt)
+        && validTime(d.updatedAt)
+        && (!('validUntil' in d) || d.validUntil is number)
+        && (d.status != 'converted' || ('convertedSaleId' in d && isShortString(d.convertedSaleId, 64)))
+        && isShortOptional(d, 'customerId', 64)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    // The owner reads everything; a cashier reads only the records they wrote.
+    function canReadRecord(businessId) {
+      return isOwner(businessId)
+        || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
+    }
+
     // ===============================================================
     // Rules (default deny: anything not listed below is refused)
     // ===============================================================
@@ -297,6 +444,71 @@ service cloud.firestore {
         allow create: if isOwner(businessId) && validProduct(productId);
         allow update: if isOwner(businessId) && validProduct(productId);
         allow delete: if isOwner(businessId);
+      }
+
+      // Credit notes: append-only, same idempotent re-send as sales.
+      match /refunds/{refundId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if isMember(businessId) && validRefund(businessId, refundId) && writtenByCaller();
+        allow update: if isMember(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Closed cash-drawer shifts: append-only.
+      match /registers/{registerId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if isMember(businessId) && validRegister(registerId) && writtenByCaller();
+        allow update: if isMember(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Stock movements: append-only audit trail.
+      match /stockMoves/{moveId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if isMember(businessId) && validStockMove(moveId) && writtenByCaller();
+        allow update: if isMember(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Suppliers and purchase orders: owner only. An order can be edited until it is received or cancelled,
+      // and never rolled back to an older version.
+      match /suppliers/{supplierId} {
+        allow read: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validSupplier(supplierId) && writtenByCaller();
+        allow update: if isOwner(businessId) && validSupplier(supplierId) && writtenByCaller()
+          && request.resource.data.updatedAt >= resource.data.updatedAt;
+        allow delete: if false;
+      }
+
+      match /purchaseOrders/{orderId} {
+        allow read: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validPurchaseOrder(orderId) && writtenByCaller();
+        allow update: if isOwner(businessId) && validPurchaseOrder(orderId) && writtenByCaller()
+          && (request.resource.data == resource.data
+              || (resource.data.status in ['draft', 'ordered']
+                  && request.resource.data.updatedAt >= resource.data.updatedAt
+                  && request.resource.data.createdAt == resource.data.createdAt));
+        allow delete: if false;
+      }
+
+      // Quotes: any member can write one; only the owner or the person who wrote it can change it, and only while open.
+      match /quotes/{quoteId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if isMember(businessId) && validQuote(quoteId) && writtenByCaller();
+        allow update: if isMember(businessId) && validQuote(quoteId)
+          && request.resource.data.staffUid == resource.data.staffUid
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (request.resource.data == resource.data
+              || (resource.data.status == 'open'
+                  && request.resource.data.updatedAt >= resource.data.updatedAt
+                  && (isOwner(businessId) || resource.data.staffUid == request.auth.uid)));
+        allow delete: if false;
       }
     }
   }
