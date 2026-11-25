@@ -274,6 +274,13 @@ const server = http.createServer((req, res) => {
   await page.click("#productEditCancel");
   await scan("product list with alerts and bulk bar");
   await page.evaluate(() =>
+    document.getElementById("scanPanel").classList.remove("hidden"),
+  );
+  await scan("camera scan dialog");
+  await page.evaluate(() =>
+    document.getElementById("scanPanel").classList.add("hidden"),
+  );
+  await page.evaluate(() =>
     document.getElementById("lockScreen").classList.remove("hidden"),
   );
   await scan("lock screen");

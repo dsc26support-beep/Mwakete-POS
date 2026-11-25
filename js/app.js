@@ -414,6 +414,7 @@ window.addEventListener("offline", connection);
   await DeliveryUI.init();
   await AnalyticsUI.init();
   await SecurityUI.init();
+  await ScanUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

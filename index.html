@@ -38,7 +38,7 @@
     <section id="view-sale" class="view">
       <div class="workspace">
         <div class="panel catalog">
-          <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Choose products</h2></div><input id="productSearch" class="search" placeholder="Search or scan barcode…" autocomplete="off"></div>
+          <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Choose products</h2></div><input id="productSearch" class="search" placeholder="Search or scan barcode…" autocomplete="off"><button id="scanCamera" class="button secondary hidden" data-feature="barcode" type="button">Scan with camera</button></div>
           <div id="productGrid" class="product-grid"></div>
           <p id="emptyProducts" class="empty hidden">No products yet. Add your first product in Products.</p>
         </div>
@@ -532,6 +532,14 @@
       </form>
     </div>
   </div>
+  <div id="scanPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+    <div class="modal-card">
+      <h3 id="scanTitle">Scan with the camera</h3>
+      <video id="scanVideo" class="scan-video" playsinline muted aria-label="Camera view"></video>
+      <p id="scanStatus" class="hint" role="status" aria-live="polite">Point the camera at a barcode.</p>
+      <div class="modal-actions"><button class="button primary" type="button" id="scanClose">Done</button></div>
+    </div>
+  </div>
   <div id="lockScreen" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
     <div class="modal-card">
       <h3 id="lockTitle">Locked</h3>
@@ -589,6 +597,7 @@
   <script src="./js/delivery.js"></script>
   <script src="./js/analytics.js"></script>
   <script src="./js/security.js"></script>
+  <script src="./js/scan.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -610,6 +619,7 @@
   <script src="./js/delivery-ui.js"></script>
   <script src="./js/analytics-ui.js"></script>
   <script src="./js/security-ui.js"></script>
+  <script src="./js/scan-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>

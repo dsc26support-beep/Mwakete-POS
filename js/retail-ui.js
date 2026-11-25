@@ -163,6 +163,44 @@ const RetailUI = (() => {
     return { ...v.value, ...w };
   }
 
+  /* A scanned or typed barcode: add the product (or pack) to the cart. Returns true if something was added. */
+  async function scanCode(raw) {
+    const code = window.ScanCore
+      ? ScanCore.clean(raw)
+      : String(raw || "").trim();
+    if (!code) return false;
+    const p = R.findBySku(await POSDB.all("products"), code);
+    if (!p && window.WholesaleUI && (await WholesaleUI.addPackBySku(code)))
+      return true;
+    if (!p) {
+      if (window.ScanUI) ScanUI.unknown(code);
+      else toast("No product with that barcode.");
+      return false;
+    }
+    const card = document.querySelector(
+      '[data-add="' + CSS.escape(p.id) + '"]',
+    );
+    if (!card) {
+      // Not drawn at the till: archived, or filtered out by the search box.
+      if (p.archived) {
+        toast(p.name + " is archived and cannot be sold.");
+        return false;
+      }
+      products_add(p);
+      return true;
+    }
+    card.click();
+    return true;
+  }
+  // Adds a product that has no card on screen (the grid shows a limited number of products).
+  function products_add(p) {
+    const holder = document.createElement("button");
+    holder.dataset.add = p.id;
+    document.body.appendChild(holder);
+    holder.click();
+    holder.remove();
+  }
+
   async function init() {
     ["discountType", "discountValue"].forEach((id) =>
       $(id).addEventListener("input", () => afterCart(lastCart)),
@@ -170,20 +208,12 @@ const RetailUI = (() => {
     $("productSearch").addEventListener("keydown", async (e) => {
       if (e.key !== "Enter" || !T.has(tier, "barcode")) return;
       e.preventDefault();
-      const code = e.target.value;
-      const p = R.findBySku(await POSDB.all("products"), code);
-      if (!p && window.WholesaleUI && (await WholesaleUI.addPackBySku(code))) {
-        e.target.value = "";
-        e.target.dispatchEvent(new Event("input"));
-        return;
+      const input = e.target;
+      const found = await scanCode(input.value);
+      if (found) {
+        input.value = "";
+        input.dispatchEvent(new Event("input"));
       }
-      if (!p) return toast("No product with that barcode.");
-      e.target.value = "";
-      e.target.dispatchEvent(new Event("input"));
-      const card = document.querySelector(
-        '[data-add="' + CSS.escape(p.id) + '"]',
-      );
-      if (card) card.click();
     });
     $("customerForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -253,6 +283,7 @@ const RetailUI = (() => {
     productExtras,
     showText,
     showReceipt,
+    scanCode,
   };
 })();
 // `const` in a classic script is not a window property; app.js checks window.RetailUI before calling the hooks.

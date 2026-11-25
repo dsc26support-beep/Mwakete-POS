@@ -32,15 +32,15 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 ## B. Barcode and product lookup
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
-| POS-021 | Camera-based barcode scanning | Missing | |
-| POS-022 | Hardware barcode scanner support | Partial | keyboard-wedge scanners work on Retail+ only |
+| POS-021 | Camera-based barcode scanning | Partial | camera scan via the browser's BarcodeDetector (Chrome/Android); button hidden elsewhere; tested with a faked camera only, not on a real phone (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-022 | Hardware barcode scanner support | Verified | keyboard-style scanners work anywhere on the till, not only in the search box (js/scan.js; tests/scan.test.js; e2e/scan) |
 | POS-023 | Search products by name | Verified | e2e resilience |
 | POS-024 | Search products by barcode | Verified | SKU/barcode field searched |
 | POS-025 | Search by product SKU | Verified | same field |
-| POS-026 | Add scanned products to cart | Partial | Retail+ only |
-| POS-027 | Handle unknown barcodes | Missing | |
-| POS-028 | Register new product from unknown barcode | Missing | |
-| POS-029 | Scanner keyboard compatibility | Partial | Enter-terminated scans, Retail+ only |
+| POS-026 | Add scanned products to cart | Verified | scan adds to the cart; packs too (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-027 | Handle unknown barcodes | Verified | unknown barcode: told, and offered a new product (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-028 | Register new product from unknown barcode | Verified | new product form opens with the barcode filled in (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-029 | Scanner keyboard compatibility | Verified | burst timing separates scanners from typing; Counter edition unchanged (js/scan.js; tests/scan.test.js; e2e/scan) |
 | POS-030 | Product lookup during offline mode | Verified | local IndexedDB (resilience e2e) |
 
 ## C. Product management
