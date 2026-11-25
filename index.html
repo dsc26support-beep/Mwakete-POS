@@ -15,10 +15,11 @@
     <a class="brand" href="#"><span class="brand-mark">M</span><span>Mwakete <small>POS</small></span></a>
     <div class="connection"><span id="onlineDot"></span><span id="connectionText">Checking connection…</span></div>
   </header>
+  <div id="updateBar" class="update-bar hidden" role="status">A new version of the app is ready. <button id="updateReload" class="button secondary" type="button">Reload now</button> <button id="updateLater" class="text-button" type="button">Later</button></div>
   <main class="shell">
     <section class="welcome">
       <div><p class="eyebrow">YOUR BUSINESS, YOUR CONTROL</p><h1>Simple sales. Even offline.</h1><p>Run your counter, track stock and keep selling when the internet drops.</p></div>
-      <div class="sync-card"><span class="sync-icon">↻</span><div><strong id="syncStatus">Ready to work</strong><small id="syncDetail">Your sales are saved on this device.</small></div><button id="syncNow" class="button secondary">Sync now</button></div>
+      <div class="sync-card"><span class="sync-icon">↻</span><div><strong id="syncStatus">Ready to work</strong><small id="syncDetail">Your sales are saved on this device.</small><small id="pendingCount" role="status"></small></div><button id="syncNow" class="button secondary">Sync now</button></div>
     </section>
     <nav class="tabs" aria-label="Main navigation">
       <button class="tab active" data-view="sale">Quick sale</button>
@@ -36,6 +37,11 @@
       <button class="tab" data-view="help">Help &amp; guides</button>
     </nav>
     <section id="view-sale" class="view">
+      <div id="setupCard" class="panel hidden">
+        <p class="eyebrow">WELCOME</p><h2>Set up your shop in a minute</h2>
+        <p class="muted">Name your business, choose the edition and the payments you accept. You can change all of it later.</p>
+        <div class="row-actions"><button id="setupStart" class="button primary" type="button">Start set-up</button><button id="setupSkip" class="button secondary" type="button">Not now</button></div>
+      </div>
       <div class="workspace">
         <div class="panel catalog">
           <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Choose products</h2></div><input id="productSearch" class="search" placeholder="Search or scan barcode…" autocomplete="off"><button id="scanCamera" class="button secondary hidden" data-feature="barcode" type="button">Scan with camera</button></div>
@@ -342,6 +348,12 @@
       </div>
     </section>
     <section id="view-setup" class="view hidden">
+      <div class="panel setup-panel" id="installPanel">
+        <p class="eyebrow">INSTALL</p><h2>Use it like an app</h2>
+        <p id="installText" class="muted"></p>
+        <button id="installBtn" class="button primary hidden" type="button">Install the app</button>
+        <p class="hint">Version <span id="installVersion"></span>. Updates download in the background; you are asked before the screen reloads, so a sale in progress is never interrupted.</p>
+      </div>
       <div class="panel setup-panel" id="securityPanel">
         <p class="eyebrow">SECURITY</p><h2>This device and screen lock</h2>
         <p class="muted">These protections live on this device. They stop casual misuse and make changes to the activity log detectable. They cannot stop someone who controls the device itself, so keep backups and use cloud sign-in for staff.</p>
@@ -532,6 +544,25 @@
       </form>
     </div>
   </div>
+  <div id="onboardPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div class="modal-card">
+      <h3 id="onboardTitle">Set up your shop</h3>
+      <form id="onboardForm" class="settings-form">
+        <label>Business name<input name="businessName" maxlength="100" required autocomplete="organization"></label>
+        <label>Currency (3 letters)<input name="currency" maxlength="3" value="AUD" required></label>
+        <label>Edition<select name="edition"><option value="counter">Counter: simple selling (micro shop)</option><option value="retail" selected>Retail: receipts, customers, reports</option><option value="wholesale">Wholesale: invoices, trade customers, quotes</option></select></label>
+        <fieldset class="packs-box"><legend>Payments you accept (cash is always on)</legend>
+          <label class="check"><input type="checkbox" name="m_eftpos" checked> EFTPOS / card</label>
+          <label class="check"><input type="checkbox" name="m_internet_banking"> Internet banking</label>
+          <label class="check"><input type="checkbox" name="m_mpaisa" checked> M-PAiSA</label>
+          <label class="check"><input type="checkbox" name="m_other"> Other</label>
+        </fieldset>
+        <label>Name for this device<input name="deviceName" maxlength="30" value="Front till" required></label>
+        <p id="onboardError" class="low" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="onboardCancel">Cancel</button><button class="button primary" type="submit">Save and start selling</button></div>
+      </form>
+    </div>
+  </div>
   <div id="scanPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
     <div class="modal-card">
       <h3 id="scanTitle">Scan with the camera</h3>
@@ -598,6 +629,8 @@
   <script src="./js/analytics.js"></script>
   <script src="./js/security.js"></script>
   <script src="./js/scan.js"></script>
+  <script src="./js/pwa.js"></script>
+  <script src="./js/onboarding.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -620,6 +653,8 @@
   <script src="./js/analytics-ui.js"></script>
   <script src="./js/security-ui.js"></script>
   <script src="./js/scan-ui.js"></script>
+  <script src="./js/pwa-ui.js"></script>
+  <script src="./js/onboarding-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>

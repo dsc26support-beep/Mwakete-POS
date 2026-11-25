@@ -206,9 +206,29 @@ const CheckoutUI = (() => {
       }
     });
   }
+  /* Offer only the payment methods this business accepts (set in the set-up card). Older installs offer all of them. */
+  async function applyMethods() {
+    const on = OnboardingCore.enabledMethods(
+      (await POSDB.get("settings", "payMethods"))?.value,
+    );
+    for (const id of ["paymentMethod", "splitMethod"])
+      for (const o of $(id).options) {
+        if (o.value === "account") continue;
+        const allowed = on.includes(o.value);
+        o.disabled = !allowed;
+        o.hidden = !allowed;
+      }
+    for (const id of ["paymentMethod", "splitMethod"]) {
+      const s = $(id);
+      if (s.selectedOptions[0]?.disabled)
+        s.value = [...s.options].find((o) => !o.disabled)?.value || "cash";
+    }
+    updateChange();
+  }
   async function init(h) {
     hooks = { ...hooks, ...h };
     bind();
+    await applyMethods();
     await loadHeld();
     updateChange();
   }
@@ -216,6 +236,6 @@ const CheckoutUI = (() => {
     $("holdSale").disabled = !cart.length;
     updateChange();
   }
-  return { init, apply, afterSale, afterCart, updateChange };
+  return { init, apply, afterSale, afterCart, updateChange, applyMethods };
 })();
 if (typeof window !== "undefined") window.CheckoutUI = CheckoutUI;

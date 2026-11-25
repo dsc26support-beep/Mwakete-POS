@@ -273,6 +273,17 @@ const server = http.createServer((req, res) => {
   await scan("product edit dialog");
   await page.click("#productEditCancel");
   await scan("product list with alerts and bulk bar");
+  await page.evaluate(() => {
+    document.getElementById("onboardPanel").classList.remove("hidden");
+    document.getElementById("setupCard").classList.remove("hidden");
+    document.getElementById("updateBar").classList.remove("hidden");
+  });
+  await scan("set-up dialog, set-up card and update bar");
+  await page.evaluate(() => {
+    document.getElementById("onboardPanel").classList.add("hidden");
+    document.getElementById("setupCard").classList.add("hidden");
+    document.getElementById("updateBar").classList.add("hidden");
+  });
   await page.evaluate(() =>
     document.getElementById("scanPanel").classList.remove("hidden"),
   );

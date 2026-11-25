@@ -27,6 +27,7 @@ async function refresh() {
   if (window.RetailUI) await RetailUI.render();
   if (window.AnalyticsUI) await AnalyticsUI.render();
   if (window.SecurityUI) await SecurityUI.render();
+  if (window.PwaUI) await PwaUI.render();
   if (window.RegisterUI) await RegisterUI.render();
   if (window.StockUI) await StockUI.render();
   if (window.QuotesUI) await QuotesUI.render();
@@ -415,6 +416,8 @@ window.addEventListener("offline", connection);
   await AnalyticsUI.init();
   await SecurityUI.init();
   await ScanUI.init();
+  await PwaUI.init();
+  await OnboardingUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();
