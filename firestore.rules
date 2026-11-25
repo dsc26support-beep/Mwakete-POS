@@ -4,50 +4,62 @@ rules_version = '2';
 // Assumed Data Model
 // ===============================================================
 //
-// One business per Firebase Authentication user. The business document ID is the
-// owner's uid, so a signed-in user can only ever reach their own business.
+// One business per owner. The business document ID is the owner's uid. Every read
+// and write requires a VERIFIED email (request.auth.token.email_verified == true).
+//
+// Roles
+//   owner   : the signed-in user whose uid equals the business ID. Full access.
+//   cashier : a verified user with an ACTIVE document at businesses/{id}/staff/{uid}
+//             (created by the owner). Can sell and read the catalogue; cannot edit
+//             products, customers or staff, and sees only their own sales/payments.
 //
 // Collection: businesses
 // Document ID: {ownerUid}
 // Fields:
-//   - ownerUid: string (required, must equal the document ID and request.auth.uid, immutable)
+//   - ownerUid: string (required, equals the document ID, immutable)
 //   - name: string (required, 1-100 chars)
 //   - createdAt: number (required, ms since epoch, immutable)
 //   - currency: string (optional, max 8 chars)
 //   - tier: string (optional: counter | retail | wholesale)
 //   - updatedAt: number (optional)
 //
-// Collection: businesses/{ownerUid}/sales      (append-only ledger)
+// Collection: businesses/{id}/staff
+// Document ID: the staff member's uid
+// Fields:
+//   - uid: string (required, equals the document ID, not the owner)
+//   - name: string (required, 1-100 chars)
+//   - role: string (required, "cashier", immutable)
+//   - active: bool (required; set false to remove access, documents are never deleted)
+//   - createdAt: number (required, immutable)
+//
+// Collection: businesses/{id}/sales      (append-only ledger)
 // Document ID: the sale's unique transaction ID (same as the "id" field)
 // Fields:
 //   - id: string (required, equals document ID, max 64 chars)
+//   - staffUid: string (required, equals the writer's uid; audit trail)
 //   - createdAt: number (required)
 //   - items: list (required, 1-200 line items)
 //   - total: number (required, 0 .. 1,000,000,000)
 //   - paymentMethod: string (required, max 30 chars)
-//   - currency, customerId, tier: string (optional)
+//   - currency, customerId: string (optional)
 //   - paymentVerified: bool (optional)
 //   - any other POS fields (discount, tax, invoice, ...): allowed, max 40 fields in total
 //
-// Collection: businesses/{ownerUid}/payments   (append-only ledger)
+// Collection: businesses/{id}/payments   (append-only ledger)
 // Document ID: the payment's unique ID (same as the "id" field)
 // Fields:
-//   - id: string (required, equals document ID)
-//   - customerId: string (required, max 64 chars)
-//   - amount: number (required, > 0 and <= 1,000,000,000)
-//   - createdAt: number (required)
+//   - id, staffUid, customerId: string (required), amount: number (> 0), createdAt: number
 //   - method, note: string (optional)
 //
-// Collection: businesses/{ownerUid}/customers  (mutable)
-// Document ID: the customer's unique ID (same as the "id" field)
-// Fields:
-//   - id: string (required, equals document ID)
-//   - name: string (required, 1-100 chars)
-//   - creditLimit: number (optional, >= 0), terms, taxNumber: string (optional)
+// Collection: businesses/{id}/customers  (trade customers; owner writes, members read)
+// Fields: id, name (required); creditLimit, terms, taxNumber (optional)
+//
+// Collection: businesses/{id}/products   (catalogue; owner writes, members read)
+// Fields: id, name, price, updatedAt (required); stock, sku, category, reorderLevel,
+//         prices (map), packs (list), taxExempt (optional)
 //
 // Not enforced here (Firestore rules cannot loop over line items): that a sale's
-// total equals its line items. Prices are chosen by the business's own app, and
-// only the owner can write to their own business.
+// total equals its line items. Prices are chosen by the business's own app.
 // ===============================================================
 
 service cloud.firestore {
@@ -57,13 +69,27 @@ service cloud.firestore {
     // Helper Functions
     // ===============================================================
 
-    function isSignedIn() {
-      return request.auth != null;
+    function isVerified() {
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // The signed-in user owns the business whose document ID is the uid.
+    // The verified signed-in user owns the business whose document ID is the uid.
     function isOwner(businessId) {
-      return isSignedIn() && request.auth.uid == businessId;
+      return isVerified() && request.auth.uid == businessId;
+    }
+
+    function staffPath(businessId) {
+      return /databases/$(database)/documents/businesses/$(businessId)/staff/$(request.auth.uid);
+    }
+
+    function isActiveStaff(businessId) {
+      return isVerified()
+        && exists(staffPath(businessId))
+        && get(staffPath(businessId)).data.active == true;
+    }
+
+    function isMember(businessId) {
+      return isOwner(businessId) || isActiveStaff(businessId);
     }
 
     function isShortString(value, maxLen) {
@@ -72,6 +98,11 @@ service cloud.firestore {
 
     function isMoney(value) {
       return value is number && value >= 0 && value <= 1000000000;
+    }
+
+    // A member may only write records that carry their own uid.
+    function writtenByCaller() {
+      return request.resource.data.staffUid == request.auth.uid;
     }
 
     // ===============================================================
@@ -90,12 +121,25 @@ service cloud.firestore {
         && (!('updatedAt' in d) || d.updatedAt is number);
     }
 
+    function validStaff(businessId, staffId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['uid', 'name', 'role', 'active', 'createdAt'])
+        && d.keys().hasAll(['uid', 'name', 'role', 'active', 'createdAt'])
+        && d.uid == staffId
+        && staffId != businessId
+        && isShortString(d.name, 100)
+        && d.role == 'cashier'
+        && d.active is bool
+        && d.createdAt is number;
+    }
+
     function validSale(saleId) {
       let d = request.resource.data;
-      return d.keys().hasAll(['id', 'createdAt', 'items', 'total', 'paymentMethod'])
+      return d.keys().hasAll(['id', 'staffUid', 'createdAt', 'items', 'total', 'paymentMethod'])
         && d.keys().size() <= 40
         && d.id == saleId
         && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
         && d.createdAt is number
         && d.items is list && d.items.size() >= 1 && d.items.size() <= 200
         && isMoney(d.total)
@@ -107,10 +151,11 @@ service cloud.firestore {
 
     function validPayment(paymentId) {
       let d = request.resource.data;
-      return d.keys().hasAll(['id', 'customerId', 'amount', 'createdAt'])
+      return d.keys().hasAll(['id', 'staffUid', 'customerId', 'amount', 'createdAt'])
         && d.keys().size() <= 20
         && d.id == paymentId
         && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
         && isShortString(d.customerId, 64)
         && d.amount is number && d.amount > 0 && d.amount <= 1000000000
         && d.createdAt is number
@@ -130,12 +175,30 @@ service cloud.firestore {
         && (!('taxNumber' in d) || (d.taxNumber is string && d.taxNumber.size() <= 50));
     }
 
+    function validProduct(productId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'name', 'price', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'name', 'price', 'stock', 'sku', 'category', 'reorderLevel', 'prices', 'packs', 'taxExempt', 'updatedAt'])
+        && d.id == productId
+        && isShortString(d.id, 64)
+        && isShortString(d.name, 100)
+        && isMoney(d.price)
+        && d.updatedAt is number
+        && (!('stock' in d) || (d.stock is number && d.stock >= 0 && d.stock <= 1000000000))
+        && (!('sku' in d) || (d.sku is string && d.sku.size() <= 80))
+        && (!('category' in d) || (d.category is string && d.category.size() <= 40))
+        && (!('reorderLevel' in d) || (d.reorderLevel is number && d.reorderLevel >= 0 && d.reorderLevel <= 1000000000))
+        && (!('prices' in d) || (d.prices is map && d.prices.size() <= 20))
+        && (!('packs' in d) || (d.packs is list && d.packs.size() <= 20))
+        && (!('taxExempt' in d) || d.taxExempt is bool);
+    }
+
     // ===============================================================
     // Rules (default deny: anything not listed below is refused)
     // ===============================================================
 
     match /businesses/{businessId} {
-      allow read: if isOwner(businessId);
+      allow read: if isMember(businessId);
       allow create: if isOwner(businessId) && validBusiness(businessId);
       allow update: if isOwner(businessId)
         && validBusiness(businessId)
@@ -143,28 +206,54 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if false;
 
-      // Append-only ledger. A re-sent record is accepted only if it is identical
-      // to the stored one, so retries after a lost connection are safe (idempotent)
-      // but a stored sale can never be altered or removed.
+      // Staff list. A cashier can read only their own record (to confirm access).
+      match /staff/{staffId} {
+        allow get: if isOwner(businessId) || (isVerified() && request.auth.uid == staffId);
+        allow list: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validStaff(businessId, staffId);
+        allow update: if isOwner(businessId)
+          && validStaff(businessId, staffId)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if false;
+      }
+
+      // Append-only ledger. A re-send is accepted only if identical to the stored
+      // record and written by the same person, so retries after a lost connection are
+      // safe (idempotent) but a stored sale can never be altered or removed.
+      // Owner reads everything; a cashier reads only records they wrote.
       match /sales/{saleId} {
-        allow read: if isOwner(businessId);
-        allow create: if isOwner(businessId) && validSale(saleId);
-        allow update: if isOwner(businessId) && request.resource.data == resource.data;
+        allow read: if isOwner(businessId)
+          || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
+        allow create: if isMember(businessId) && validSale(saleId) && writtenByCaller();
+        allow update: if isMember(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
       }
 
       match /payments/{paymentId} {
-        allow read: if isOwner(businessId);
-        allow create: if isOwner(businessId) && validPayment(paymentId);
-        allow update: if isOwner(businessId) && request.resource.data == resource.data;
+        allow read: if isOwner(businessId)
+          || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
+        allow create: if isMember(businessId) && validPayment(paymentId) && writtenByCaller();
+        allow update: if isMember(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
       }
 
       match /customers/{customerId} {
-        allow read: if isOwner(businessId);
+        allow read: if isMember(businessId);
         allow create: if isOwner(businessId) && validCustomer(customerId);
         allow update: if isOwner(businessId) && validCustomer(customerId);
         allow delete: if false;
+      }
+
+      match /products/{productId} {
+        allow read: if isMember(businessId);
+        allow create: if isOwner(businessId) && validProduct(productId);
+        allow update: if isOwner(businessId) && validProduct(productId);
+        allow delete: if isOwner(businessId);
       }
     }
   }

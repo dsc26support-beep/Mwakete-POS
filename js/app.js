@@ -118,7 +118,20 @@ document.addEventListener("click", async (e) => {
   }
   const del = e.target.closest("[data-delete]");
   if (del) {
+    const gone = products.find((x) => x.id === del.dataset.delete);
     await POSDB.remove("products", del.dataset.delete);
+    // A product that reached the cloud leaves a removal marker, so the delete can be sent on the next sync.
+    if (gone && gone.cloudSyncedAt) {
+      const cur =
+        (await POSDB.get("settings", "productTombstones"))?.value || [];
+      await POSDB.put("settings", {
+        key: "productTombstones",
+        value: [
+          ...cur.filter((t) => t.id !== gone.id),
+          { id: gone.id, at: Date.now() },
+        ],
+      });
+    }
     await refresh();
     toast("Product removed");
     return;

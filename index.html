@@ -194,6 +194,40 @@
               <button class="button secondary" type="button" id="cloudReset">Forgot password</button>
             </div>
           </form>
+          <div id="cloudVerify" class="notice warn hidden">
+            <strong>Verify your email to start syncing</strong>
+            <p>We sent a link to your email. Open it, then press the button below. Your sales stay saved on this device until then.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="button primary" type="button" id="cloudRefresh">I have verified</button>
+              <button class="button secondary" type="button" id="cloudResend">Send the email again</button>
+            </div>
+          </div>
+          <div id="cloudOwner" class="hidden">
+            <h4>Your business code</h4>
+            <p class="muted">Staff need this code to join your business. It is not a password, but share it only with people you trust.</p>
+            <p><code id="cloudBizCode"></code> <button class="text-button" type="button" id="cloudCopyBiz">Copy</button></p>
+            <h4>Staff (cashiers)</h4>
+            <p class="muted">A cashier creates their own account, verifies their email, and sends you their <b>staff code</b>. Cashiers can sell and see the product list. They cannot change products, customers or staff, and they only see their own sales.</p>
+            <form id="staffForm" class="settings-form">
+              <label>Staff code<input name="staffCode" maxlength="128" autocomplete="off" required></label>
+              <label>Name<input name="staffName" maxlength="100" required></label>
+              <button class="button primary" type="submit">Add cashier</button>
+            </form>
+            <div id="staffList"></div>
+          </div>
+          <div id="cloudStaffJoin" class="hidden">
+            <h4>Work for another business (cashier)</h4>
+            <p class="muted">Your staff code: <code id="cloudMyCode"></code> <button class="text-button" type="button" id="cloudCopyMine">Copy</button></p>
+            <form id="joinForm" class="settings-form">
+              <label>Business code from the owner<input name="bizCode" maxlength="128" autocomplete="off" required></label>
+              <button class="button secondary" type="submit">Join business</button>
+            </form>
+          </div>
+          <div id="cloudCashier" class="notice hidden">
+            <strong>You are working as a cashier</strong>
+            <p>This device uses the owner's business. Products come from the owner and cannot be edited here.</p>
+            <button class="button secondary" type="button" id="cloudLeave">Leave this business</button>
+          </div>
           <button class="button secondary hidden" type="button" id="cloudSignOut">Sign out</button>
         </div>
         <div class="notice"><strong>Mwakete Marketplace connection</strong><p>The Mwakete adapter is a documented integration boundary. It must be connected to verified existing Mwakete authentication and APIs before marketplace accounts or live inventory are enabled.</p></div>

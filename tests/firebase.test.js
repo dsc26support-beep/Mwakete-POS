@@ -25,9 +25,20 @@ function fakeFs({ failWith = {}, existing = {} } = {}) {
         throw Object.assign(new Error("x"), { code: failWith[id] });
       store.set(ref, data);
     },
+    deleteDoc: async (ref) => {
+      const id = ref.split("/").pop();
+      if (failWith[id])
+        throw Object.assign(new Error("x"), { code: failWith[id] });
+      store.delete(ref);
+    },
     getDocs: async (q) => ({
       docs: [...store.entries()]
-        .filter(([k, v]) => k.startsWith(q.col + "/") && v[q.w.f] === q.w.v)
+        .filter(
+          ([k, v]) =>
+            k.startsWith(q.col + "/") &&
+            !k.slice(q.col.length + 1).includes("/") &&
+            (!q.w || v[q.w.f] === q.w.v),
+        )
         .map(([, v]) => ({ data: () => v })),
     }),
   };

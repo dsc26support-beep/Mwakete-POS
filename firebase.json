@@ -10,6 +10,11 @@
     "database": "(default)",
     "location": "australia-southeast1"
   },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "ui": { "enabled": false }
+  },
   "hosting": {
     "site": "mwakete-pos",
     "public": ".",

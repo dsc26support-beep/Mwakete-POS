@@ -12,7 +12,19 @@ const POSSynchroniser = {
         r.syncStatus !== "synced" && r.syncStatus !== "rejected";
       const sales = (await POSDB.all("sales")).filter(open);
       const payments = (await POSDB.all("payments")).filter(open);
-      if (!sales.length && !payments.length) {
+      // Signed in to the cloud account -> Firebase. Otherwise the optional Google Apps Script backend.
+      const useFirebase =
+        typeof FirebaseBackend !== "undefined" && FirebaseBackend.isSignedIn();
+      const owner = useFirebase && FirebaseBackend.role() === "owner";
+      // Catalogue changes still to be pushed (owner only) and product removals still to be confirmed.
+      const products = owner
+        ? (await POSDB.all("products")).filter(FirebaseBackend.isDirty)
+        : [];
+      const productDeletes = owner
+        ? (await POSDB.get("settings", "productTombstones"))?.value || []
+        : [];
+      // A signed-in cloud account always syncs, even with nothing pending, so the catalogue is pulled.
+      if (!useFirebase && !sales.length && !payments.length) {
         const rejected =
           (await POSDB.all("sales")).filter((s) => s.syncStatus === "rejected")
             .length +
@@ -47,9 +59,6 @@ const POSSynchroniser = {
             taxNumber: c.taxNumber,
           });
       }
-      // Signed in to the cloud account -> Firebase. Otherwise the optional Google Apps Script backend.
-      const useFirebase =
-        typeof FirebaseBackend !== "undefined" && FirebaseBackend.isSignedIn();
       const backend = useFirebase ? FirebaseBackend : GoogleBackend;
       const business = {
         name: (await POSDB.get("settings", "businessName"))?.value,
@@ -63,6 +72,9 @@ const POSSynchroniser = {
         payments,
         customers,
         business,
+        ...(useFirebase
+          ? { products, productDeletes: productDeletes.map((t) => t.id) }
+          : {}),
       });
       if (!result || !Array.isArray(result.acceptedIds))
         throw new Error(
@@ -80,6 +92,9 @@ const POSSynchroniser = {
             cur[id] = { amount: Number(amount), at };
         await POSDB.put("settings", { key: "balances", value: cur });
       }
+      const cloud = useFirebase
+        ? await applyCloud(result, products, productDeletes)
+        : null;
       const synced =
         changes.sales.filter((s) => s.syncStatus === "synced").length +
         changes.payments.filter((p) => p.syncStatus === "synced").length;
@@ -92,7 +107,21 @@ const POSSynchroniser = {
             rej +
             " rejected by your ledger. See Accounts.",
         );
-      else setSyncUI("Sync complete", synced + " record(s) synchronised.");
+      else if (cloud && cloud.rejectedProducts)
+        setSyncUI(
+          "Sync needs attention",
+          synced +
+            " synchronised. " +
+            cloud.rejectedProducts +
+            " product(s) were refused by the cloud rules; check their fields.",
+        );
+      else
+        setSyncUI(
+          "Sync complete",
+          synced +
+            " record(s) synchronised." +
+            (cloud && cloud.summary ? " " + cloud.summary : ""),
+        );
       if (window.InvoiceUI) await InvoiceUI.render();
       if (typeof refresh === "function") await refresh();
     } catch (e) {
@@ -103,6 +132,64 @@ const POSSynchroniser = {
     }
   },
 };
+/* Apply what the cloud confirmed. Local products are marked cloudSyncedAt ONLY for ids the server accepted;
+ * a product removal tombstone is cleared ONLY when the server confirmed the delete. */
+async function applyCloud(result, sentProducts, sentDeletes) {
+  const accepted = new Map(
+    (result.acceptedProducts || []).map((p) => [p.id, p.updatedAt]),
+  );
+  for (const p of sentProducts) {
+    if (!accepted.has(p.id)) continue;
+    const cur = await POSDB.get("products", p.id);
+    // Only if it was not edited again while the sync was running.
+    if (cur && (cur.updatedAt || 0) === accepted.get(p.id))
+      await POSDB.put("products", {
+        ...cur,
+        cloudSyncedAt: accepted.get(p.id),
+      });
+  }
+  if (sentDeletes.length) {
+    const done = new Set(result.deletedProductIds || []);
+    const left = sentDeletes.filter((t) => !done.has(t.id));
+    if (left.length !== sentDeletes.length)
+      await POSDB.put("settings", { key: "productTombstones", value: left });
+  }
+  let added = 0,
+    removed = 0;
+  if (Array.isArray(result.cloudProducts)) {
+    const tomb = new Set(
+      ((await POSDB.get("settings", "productTombstones"))?.value || []).map(
+        (t) => t.id,
+      ),
+    );
+    const { upserts, removes } = FirebaseBackend.mergeProducts(
+      await POSDB.all("products"),
+      result.cloudProducts.filter((c) => !tomb.has(c.id)),
+    );
+    for (const p of upserts) {
+      await POSDB.put("products", p);
+      added++;
+    }
+    for (const id of removes) {
+      await POSDB.remove("products", id);
+      removed++;
+    }
+  }
+  // Trade customers created by the owner appear on cashier devices. Existing local customers are never overwritten.
+  if (Array.isArray(result.cloudCustomers)) {
+    for (const c of result.cloudCustomers) {
+      if (!c || !c.id || (await POSDB.get("customers", c.id))) continue;
+      await POSDB.put("customers", { ...c, type: "trade" });
+    }
+  }
+  const parts = [];
+  if (added) parts.push(added + " product(s) updated from the cloud.");
+  if (removed) parts.push(removed + " product(s) removed by the owner.");
+  return {
+    summary: parts.join(" "),
+    rejectedProducts: (result.rejectedProducts || []).length,
+  };
+}
 function setSyncUI(title, detail) {
   const a = document.getElementById("syncStatus"),
     b = document.getElementById("syncDetail");
