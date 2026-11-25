@@ -1,32 +1,41 @@
-# Handoff (live) — Mwakete POS + Firebase
+# handoff: mwakete-pos-live
+project: mwakete-pos
+type: code
+generated: 2026-11-25
+goal: Close EVERY capability in user's PDF (POS-001..172, sections M device/PWA, N optional Mwakete). FREE only (no Blaze/paid SMS), all tests green ("nothing breaks 100%"), non-stop. Then security review + fixes, then report + recommendations.
 
-## Goal
-Close EVERY capability in the user's PDF (POS-001..172, sections M, N). FREE only, ALL tests green, work non-stop. Then security review + fixes, then final report + recommendations.
+## next-steps  <!-- resume here -->
+1. Barcode: unknown barcode -> register product; camera scan (BarcodeDetector, optional); hardware scanner on all tiers (POS-021,022,026-029).
+2. PWA/section M: PNG icons, install prompt, update-available prompt, connection badge, onboarding wizard.
+3. Optional Mwakete integration: honest DISCONNECTED screens + docs template; no invented APIs.
+4. Cloud role e2e (manager/inventory/auditor) in tests/e2e/firebase-cloud.e2e.js.
+5. User tasks via workarounds: delete smoke-test acct (firestore:delete businesses/<uid> --recursive + Identity Toolkit admin delete w/ CLI token); API-key restriction only w/ tested rollback; App Check no-op until site key.
+6. Docs set (ARCHITECTURE, OFFLINE_SYNC, DATA_MODEL, TESTING, TROUBLESHOOTING, CHANGELOG, DEPLOYMENT, FIREBASE_SETUP, API_DOCUMENTATION); update README, SECURITY.md, rules header comment.
+7. Security review + fixes; final report (implemented/verified/failed/pending separately).
 
-## State (2026-11-25, end of session segment)
-- Branch claude/pensive-curie-l1iir1 (pushed, HEAD 7efed5b+), PR #1 draft. Live https://mwakete-pos.web.app deployed with batches 1-6 + roles rules.
-- Truth source: docs/CAPABILITY_REGISTER.md. Update rows with scratchpad script pattern (awk edit by POS id) because the Bash hook blocks long sed.
-- DONE: Phase 0 register; 1 checkout (change due, EFTPOS/IB/MPaisa, split, hold/resume); 2 catalogue (edit/archive/desc/cost/unit/picture/bulk/filters/valuation/price history; cost+image device-only); 3 transactions (receipt no R-<dev>-n, search/filter/export/integrity/timeline); 4 delivery queue (mailto/sms/wa.me, user-confirmed Delivered; customer email/address/group); 5 reports (week/month/custom, filters, profit estimate); 6 roles (cashier/manager/inventory/auditor in rules+UI), device-local tamper-evident audit log, PIN lock + idle lock, device name, sale.deviceId.
-- Bug fixed: cart draft restore race (saveDraft gated by draftReady in app.js).
-- Tests green at last run: unit 321, browser x16 suites, rules 50, cloud e2e, axe 0.
+## state
+- done: Phase0 docs/CAPABILITY_REGISTER.md (source of truth); checkout.js; catalogue.js; txn.js; delivery.js; analytics.js; security.js (+ *-ui.js); roles in firestore.rules (cashier/manager/inventory/auditor).
+- deployed: https://mwakete-pos.web.app incl. rules. Branch claude/pensive-curie-l1iir1, PR #1 draft.
+- verified: unit 321, browser x16 suites, rules 50, cloud e2e, axe 0.
+- unverified: real devices, screen reader, manager/auditor through real cloud sign-in.
 
-## Remaining (in order)
-7. Barcode: unknown barcode -> register product; camera scan (BarcodeDetector, optional); hardware scanner on all tiers (021,022,026-029). Micro POS UI/change already via checkout; adaptive workspaces; onboarding wizard; PWA: PNG icons, install prompt, update-available prompt, connection badge, storage persist (section M).
-8. Optional Mwakete integration: honest DISCONNECTED adapter screens (status/authorize/disconnect), no invented APIs; docs/API template.
-9. Cloud role e2e (manager/inventory/auditor) in tests/e2e/firebase-cloud.e2e.js; audit log + devices cloud sync (needs DB v6 stores) = optional.
-10. User tasks via workarounds: delete smoke-test account mwakete.smoketest.1795582984250@example.com (firestore:delete businesses/<uid> --recursive + Identity Toolkit admin delete with CLI token); API-key restriction only with tested rollback; App Check optional no-op until site key.
-11. Docs set: ARCHITECTURE, OFFLINE_SYNC, DATA_MODEL, TESTING, TROUBLESHOOTING, CHANGELOG, DEPLOYMENT, FIREBASE_SETUP, API_DOCUMENTATION; update README, SECURITY.md (roles, lock, audit log, honest limits), rules header comment.
-12. Security review + fixes, then final report (implemented/verified/failed/pending separately) + recommendations.
+## decisions
+- Receipt delivery = mailto/sms/wa.me links + local queue; "Delivered" = user-confirmed (no paid APIs, no stored creds).
+- costPrice + product image device-only (cashiers can read catalogue; margins must stay private).
+- Stock warn-not-block (per-device counts can be stale); qty cap 9999.
+- Audit log + PIN device-local (no DB bump); hash chain = tamper-evident only.
 
-## Gotchas
-- Bash hook: <=10 statements/pipes, <=500 chars, no heredocs/inline scripts; use Write for scripts in scratchpad (/tmp/claude-0/-home-user/ddc10b85-.../scratchpad/): regress.sh (full regression), flaky.sh <suite> <n>, reg1.sh ID STATUS "evidence".
-- Top-level `const X` in classic scripts is NOT on window: use `typeof X !== "undefined"` (CloudUI, FirebaseBackend, Diagnostics).
-- Playwright waitForFunction with async predicate is always true: poll from Node. e.currentTarget null after await.
-- Receipts only on Retail+; new sale fields need rules checks (validSale <=40 keys); cost price/image never synced.
-- Offline reload tests need `navigator.serviceWorker.ready` + wait.
-- Deploy: npx -y firebase-tools@latest deploy --only firestore:rules,hosting --project mwakete-pos (CLI logged in as admin@mwakete.com).
-- Regression: bash <scratchpad>/regress.sh (unit, browser, a11y, rules, cloud).
+## gotchas
+- Bash hook: <=10 statements, <=500 chars, no heredocs; use Write for scratchpad scripts (regress.sh, flaky.sh, reg1.sh).
+- Top-level const in classic scripts not on window: use typeof X !== "undefined".
+- waitForFunction async predicate always true; poll from Node. e.currentTarget null after await.
+- Offline reload tests need serviceWorker.ready + wait. Fixed real bug: draftReady gate in app.js.
+- New sale fields need rules checks (validSale <=40 keys).
+- Deploy: npx -y firebase-tools@latest deploy --only firestore:rules,hosting --project mwakete-pos.
 
-## Open questions
-- Marketplace API contract unavailable (integration stays disconnected stub).
-- "Create standoff" from the user was read as "write a handoff" (this file).
+## git
+- branch: claude/pensive-curie-l1iir1; HEAD ~004938a
+
+## open-questions
+- Marketplace API contract unavailable (stub only).
+- User's "Create standoff" read as "write a handoff".
