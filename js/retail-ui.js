@@ -193,7 +193,14 @@ const RetailUI = (() => {
       if (!extras) return;
       const r = await R.addCustomer(
         POSDB,
-        { name: f.name.value, phone: f.phone.value, notes: f.notes.value },
+        {
+          name: f.name.value,
+          phone: f.phone.value,
+          notes: f.notes.value,
+          email: f.email.value,
+          address: f.address.value,
+          category: f.category.value,
+        },
         newId(),
       );
       if (!r.ok) return toast(r.error);

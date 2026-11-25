@@ -147,7 +147,30 @@ const RetailCore = (() => {
         ok: false,
         error: "Note is too long (max " + LIMITS.notes + " characters).",
       };
-    return { ok: true, value: { name, phone, notes } };
+    const email = String(input?.email ?? "").trim();
+    if (
+      email &&
+      (email.length > 120 ||
+        !/^[^\s@]{1,64}@[^\s@]{1,100}\.[^\s@]{2,}$/.test(email))
+    )
+      return {
+        ok: false,
+        error: "Enter a valid email address or leave it empty.",
+      };
+    const address = String(input?.address ?? "").trim();
+    if (address.length > 120)
+      return { ok: false, error: "Address is too long (max 120 characters)." };
+    const category = String(input?.category ?? "").trim();
+    if (category.length > 30)
+      return {
+        ok: false,
+        error: "Customer group is too long (max 30 characters).",
+      };
+    const value = { name, phone, notes };
+    if (email) value.email = email;
+    if (address) value.address = address;
+    if (category) value.category = category;
+    return { ok: true, value };
   }
   async function addCustomer(store, input, id, now = Date.now()) {
     const v = validateCustomer(input);
@@ -325,7 +348,7 @@ const RetailCore = (() => {
   }
   // `extraHtml` is pre-escaped HTML from a trusted builder (e.g. the Wholesale trade badge).
   function customerRow(c, extraHtml = "") {
-    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div>`;
+    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${c.email ? `<small>${esc(c.email)}</small>` : ""}${c.category ? `<small>Group: ${esc(c.category)}</small>` : ""}${c.address ? `<small>${esc(c.address)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div>`;
   }
   function table(head, rows) {
     return rows.length

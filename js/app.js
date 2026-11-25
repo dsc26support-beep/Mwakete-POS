@@ -396,6 +396,7 @@ window.addEventListener("offline", connection);
   });
   await CatalogueUI.init();
   await TxnUI.init();
+  await DeliveryUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

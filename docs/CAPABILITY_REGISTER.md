@@ -131,15 +131,15 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-097 | Receipt number | Verified | R-<device>-<seq> on every new sale, shown on receipts (js/txn.js; tests/txn.test.js; e2e/txn) |
 | POS-098 | Receipt formatting | Verified | 32-column text |
 | POS-099 | Print receipt | Partial | browser print only; no thermal-printer driver |
-| POS-100 | Digital receipt | Partial | copy as text |
-| POS-101 | Email receipt | Missing | |
-| POS-102 | SMS receipt | Missing | |
-| POS-103 | WhatsApp receipt | Missing | |
-| POS-104 | Receipt delivery queue | Missing | |
-| POS-105 | Receipt delivery status | Missing | |
-| POS-106 | Retry failed delivery | Missing | |
-| POS-107 | Customer database | Verified | local |
-| POS-108 | Customer contact details | Partial | |
+| POS-100 | Digital receipt | Verified | copy as text, or send from the details dialog (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-101 | Email receipt | Verified | mailto link opens the user's email app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid email service |
+| POS-102 | SMS receipt | Verified | sms link opens the user's messaging app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid SMS service |
+| POS-103 | WhatsApp receipt | Verified | wa.me link opens WhatsApp; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not the WhatsApp Business API |
+| POS-104 | Receipt delivery queue | Verified | local queue, up to 200, survives reload (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-105 | Receipt delivery status | Verified | Queued / Sending / Delivered / Failed / Retry pending / Cancelled; Delivered means the user confirmed it (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-106 | Retry failed delivery | Verified | Failed -> Retry -> Send again, attempts counted (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-107 | Customer database | Verified | local customer list with search at checkout |
+| POS-108 | Customer contact details | Verified | phone, email, address, customer group, note validated (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
 | POS-109 | Customer purchase history | Partial | trade statements only |
 | POS-110 | Customer selection at checkout | Verified | |
 

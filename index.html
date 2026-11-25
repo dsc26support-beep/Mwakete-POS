@@ -159,6 +159,7 @@
         <p id="txnSummary" class="hint" role="status"></p>
         <div class="row-actions"><button id="txnExport" class="button secondary" type="button">Export sales (CSV)</button></div>
         <div id="salesList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">RECEIPTS</p><h2>Delivery queue</h2></div></div><p class="hint">Receipts waiting to be sent by SMS, WhatsApp or email. Sending opens your own app; you confirm it was sent.</p><div id="deliveryList" aria-live="polite"></div></div>
       <div class="panel hidden" data-feature="refunds"><div class="section-heading"><div><p class="eyebrow">CREDIT NOTES</p><h2>Refunds and returns</h2></div></div><p class="hint">Open a sale and press <strong>Refund…</strong>. A refund never changes the original sale; it is recorded as a credit note. Credit notes reach your cloud account when you are signed in.</p><div id="refundsList"></div></div>
     </section>
     <section id="view-register" class="view hidden">
@@ -258,6 +259,9 @@
         <form id="customerForm" class="settings-form">
           <label>Name<input name="name" maxlength="80" required placeholder="Customer name"></label>
           <label>Phone (optional)<input name="phone" maxlength="20" placeholder="+686 …"></label>
+          <label>Email (optional)<input name="email" type="email" maxlength="120" placeholder="name@example.com"></label>
+          <label>Address (optional)<input name="address" maxlength="120" placeholder="Village / island"></label>
+          <label>Customer group (optional)<input name="category" maxlength="30" placeholder="e.g. Regular, Staff"></label>
           <label>Note (optional)<input name="notes" maxlength="300" placeholder="Short note"></label>
           <label data-feature="tradeCustomers" class="hidden">Customer type<select name="customerType"><option value="retail">Regular customer</option><option value="trade">Trade customer</option></select></label>
           <label data-feature="tradeCustomers" class="hidden">Price list (trade)<select name="priceListId" id="customerPriceList"><option value="">Base price</option></select></label>
@@ -495,7 +499,20 @@
     <div class="modal-card">
       <h3 id="txnTitle">Sale details</h3>
       <div id="txnBody"></div>
-      <div class="modal-actions"><button class="button primary" type="button" id="txnClose">Close</button></div>
+      <div class="modal-actions"><button class="button secondary" type="button" id="txnSend">Send receipt…</button><button class="button primary" type="button" id="txnClose">Close</button></div>
+    </div>
+  </div>
+  <div id="deliveryPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deliveryTitle">
+    <div class="modal-card">
+      <h3 id="deliveryTitle">Send a receipt</h3>
+      <p class="hint">This opens your own email, SMS or WhatsApp app with the receipt filled in. Only send a receipt to a customer who asked for it. The app cannot see whether the message went, so you confirm it afterwards.</p>
+      <form id="deliveryForm" class="settings-form">
+        <label>Send by<select name="channel" id="deliveryChannel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
+        <label>To (phone with country code, or email)<input name="to" id="deliveryTo" required maxlength="120" autocomplete="off"></label>
+        <label>Message<textarea name="text" id="deliveryText" rows="5" maxlength="2000"></textarea></label>
+        <p id="deliveryError" class="low" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="deliveryCancel">Cancel</button><button class="button secondary" type="button" id="deliveryQueue">Add to queue</button><button class="button primary" type="submit">Send now</button></div>
+      </form>
     </div>
   </div>
   <div id="heldPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="heldTitle">
@@ -521,6 +538,7 @@
   <script src="./js/checkout.js"></script>
   <script src="./js/catalogue.js"></script>
   <script src="./js/txn.js"></script>
+  <script src="./js/delivery.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -539,6 +557,7 @@
   <script src="./js/checkout-ui.js"></script>
   <script src="./js/catalogue-ui.js"></script>
   <script src="./js/txn-ui.js"></script>
+  <script src="./js/delivery-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>

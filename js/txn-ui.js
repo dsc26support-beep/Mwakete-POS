@@ -19,7 +19,8 @@ const TxnUI = (() => {
   const MAX_SHOWN = 100;
   let sales = [],
     refunds = [],
-    customers = [];
+    customers = [],
+    openId = "";
 
   const dayStart = (v) => (v ? new Date(v + "T00:00:00").getTime() : undefined);
   const dayEnd = (v) =>
@@ -75,6 +76,7 @@ const TxnUI = (() => {
   function openDetails(id) {
     const s = sales.find((x) => x.id === id);
     if (!s) return;
+    openId = id;
     const issues = X.checkIntegrity(s);
     const cust = s.customerId && customers.find((c) => c.id === s.customerId);
     $("txnTitle").textContent = "Sale " + X.label(s);
@@ -129,6 +131,11 @@ const TxnUI = (() => {
       $("txnPanel").classList.add("hidden"),
     );
     $("txnExport").addEventListener("click", download);
+    $("txnSend").addEventListener("click", () => {
+      if (!openId || !window.DeliveryUI) return;
+      $("txnPanel").classList.add("hidden");
+      DeliveryUI.open(openId);
+    });
   }
   return { init, render };
 })();
