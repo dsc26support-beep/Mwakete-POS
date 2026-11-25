@@ -47,11 +47,22 @@ const RegisterCore = (() => {
       cashPayments = 0,
       cashRefunds = 0,
       count = 0;
-    for (const s of sales || [])
-      if (within(s, open.openedAt, until) && s.paymentMethod === "cash") {
-        cashSales += toMinor(s.total);
+    for (const s of sales || []) {
+      if (!within(s, open.openedAt, until)) continue;
+      // Split sales: only the cash part enters the drawer (change already deducted).
+      const cash = Array.isArray(s.payments)
+        ? s.payments.reduce(
+            (n, p) => n + (p && p.method === "cash" ? toMinor(p.amount) : 0),
+            0,
+          )
+        : s.paymentMethod === "cash"
+          ? toMinor(s.total)
+          : 0;
+      if (cash > 0) {
+        cashSales += cash;
         count++;
       }
+    }
     for (const p of payments || [])
       if (within(p, open.openedAt, until) && (p.method || "cash") === "cash")
         cashPayments += toMinor(p.amount);

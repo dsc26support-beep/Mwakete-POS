@@ -13,10 +13,10 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-003 | Remove products from cart | Verified | decrement to zero removes the line (e2e) |
 | POS-004 | Modify product quantity | Verified | +/− controls (e2e) |
 | POS-005 | Calculate totals automatically | Verified | unit retail/wholesale/invoices |
-| POS-006 | Calculate change due | Missing | no cash-tendered input yet |
+| POS-006 | Calculate change due | Verified | CheckoutCore.changeDue + live change display (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
 | POS-007 | Cancel transactions | Partial | clear cart works; cancelling a completed sale = credit note only |
-| POS-008 | Hold or suspend a sale | Missing | |
-| POS-009 | Resume held sales | Missing | |
+| POS-008 | Hold or suspend a sale | Verified | hold/resume stored on the device, survives reload (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-009 | Resume held sales | Verified | hold/resume stored on the device, survives reload (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
 | POS-010 | Clear cart | Verified | e2e |
 | POS-011 | Prevent invalid quantities | Partial | +/− only; no upper bound or stock check |
 | POS-012 | Handle checkout validation | Partial | invoice/credit-limit/payment-method checks exist |
@@ -109,14 +109,14 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
 | POS-081 | Cash payments | Verified | |
-| POS-082 | Bank EFTPOS/card recording | Missing | only "Other" |
-| POS-083 | Internet Banking recording | Missing | |
-| POS-084 | MPaisa recording | Missing | |
-| POS-085 | Split payments | Missing | |
-| POS-086 | Partial payment recording | Partial | payments against a credit account |
-| POS-087 | Payment validation | Partial | |
-| POS-088 | Payment method reporting | Partial | cloud report only |
-| POS-089 | Cash change calculation | Missing | |
+| POS-082 | Bank EFTPOS/card recording | Verified | EFTPOS/card recorded, never verified (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-083 | Internet Banking recording | Verified | Internet banking recorded, never verified (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-084 | MPaisa recording | Verified | M-PAiSA recorded, never verified (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-085 | Split payments | Verified | up to 4 payment lines that must add up; rules validate (rules test) |
+| POS-086 | Partial payment recording | Verified | split payments plus account payments (e2e checkout, invoices) |
+| POS-087 | Payment validation | Verified | overpay, duplicates, unknown methods refused (unit) |
+| POS-088 | Payment method reporting | Partial | methodTotals + cloud report split by method; no local report screen yet |
+| POS-089 | Cash change calculation | Verified | CheckoutCore.changeDue + live change display (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
 | POS-090 | Cash reconciliation | Verified | register e2e |
 | POS-091 | Cash drawer opening balance | Verified | |
 | POS-092 | Cash drawer closing balance | Verified | |

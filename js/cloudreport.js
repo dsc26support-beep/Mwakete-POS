@@ -64,13 +64,20 @@ const CloudReport = (() => {
       const dr = dayRow(dayOf(s.createdAt, off));
       dr.sales++;
       dr.gross += g;
-      const m = bump(methodRows, s.paymentMethod || "other", () => ({
-        method: s.paymentMethod || "other",
-        sales: 0,
-        gross: 0,
-      }));
-      m.sales++;
-      m.gross += g;
+      // Split sales are spread across the methods that paid them.
+      const parts =
+        Array.isArray(s.payments) && s.payments.length
+          ? s.payments.map((p) => [p.method || "other", toMinor(p.amount)])
+          : [[s.paymentMethod || "other", g]];
+      for (const [method, minor] of parts) {
+        const m = bump(methodRows, method, () => ({
+          method,
+          sales: 0,
+          gross: 0,
+        }));
+        m.sales++;
+        m.gross += minor;
+      }
       for (const it of s.items || []) {
         const key = it.productId || it.name;
         const p = bump(productRows, key, () => ({

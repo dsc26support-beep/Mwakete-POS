@@ -68,6 +68,7 @@ function renderCart() {
   $("total").textContent = money(total);
   $("checkout").disabled = !cart.length;
   if (window.RetailUI) RetailUI.afterCart(cart);
+  if (window.CheckoutUI) CheckoutUI.afterCart(cart);
   $("checkout").textContent =
     $("paymentMethod").value === "cash"
       ? "Complete cash sale"
@@ -255,6 +256,7 @@ $("checkout").addEventListener("click", async () => {
   if (!cart.length) return;
   const method = $("paymentMethod").value;
   if (
+    !window.CheckoutUI &&
     method !== "cash" &&
     method !== "account" &&
     !confirm(
@@ -281,6 +283,7 @@ $("checkout").addEventListener("click", async () => {
       syncStatus: "pending",
     };
   if (window.RetailUI && !(await RetailUI.decorateSale(sale, cart))) return;
+  if (window.CheckoutUI && !CheckoutUI.apply(sale)) return;
   await POSDB.put("sales", sale);
   for (const line of cart) {
     const p = products.find((x) => x.id === (line.productId || line.id));
@@ -292,6 +295,7 @@ $("checkout").addEventListener("click", async () => {
   cart = [];
   await refresh();
   toast("Sale saved. Receipt ID: " + sale.id);
+  if (window.CheckoutUI) CheckoutUI.afterSale(sale);
   if (window.RetailUI) RetailUI.afterSale(sale);
   if (window.QuotesUI) await QuotesUI.afterSale(sale);
 });
@@ -352,6 +356,13 @@ window.addEventListener("offline", connection);
   await RetailUI.init();
   await WholesaleUI.init();
   await InvoiceUI.init();
+  await CheckoutUI.init({
+    getCart: () => cart,
+    setCart: (c) => {
+      cart = c;
+    },
+    render: renderCart,
+  });
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

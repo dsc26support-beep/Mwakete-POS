@@ -203,6 +203,40 @@ test("sales: owner can create a plain sale and the real wholesale invoice shape"
   );
 });
 
+test("sales: split payments with references are accepted; malformed ones and verified digital are refused", async () => {
+  const w = (id, extra) =>
+    setDoc(ref(db(OWNER), "businesses", OWNER, "sales", id), {
+      ...sale(id),
+      ...extra,
+    });
+  await assertSucceeds(
+    w("sp1", {
+      paymentMethod: "split",
+      paymentVerified: false,
+      tendered: 20,
+      change: 2.5,
+      payments: [
+        { method: "eftpos", amount: 12.5, reference: "A1" },
+        { method: "cash", amount: 17.5 },
+      ],
+    }),
+  );
+  await assertFails(w("sp2", { payments: [] }));
+  await assertFails(w("sp3", { payments: [{ method: "bitcoin", amount: 1 }] }));
+  await assertFails(
+    w("sp4", { payments: [{ method: "cash", amount: 1, extra: true }] }),
+  );
+  await assertFails(w("sp5", { payments: [{ method: "cash", amount: "1" }] }));
+  await assertFails(w("sp6", { change: "2" }));
+  await assertFails(
+    w("sp7", {
+      paymentMethod: "split",
+      paymentVerified: true,
+      payments: [{ method: "mpaisa", amount: 1 }],
+    }),
+  );
+});
+
 test("sales: re-sending the identical record is accepted (idempotent retry)", async () => {
   const r = ref(db(OWNER), "businesses", OWNER, "sales", "s1");
   await assertSucceeds(setDoc(r, sale("s1")));

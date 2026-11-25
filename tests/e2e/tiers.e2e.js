@@ -177,16 +177,19 @@ const eq = (a, b, msg) => {
   eq(
     Object.keys(counterSale).sort(),
     [
+      "change",
       "createdAt",
       "currency",
       "id",
       "items",
       "paymentMethod",
       "paymentVerified",
+      "payments",
       "syncStatus",
+      "tendered",
       "total",
     ],
-    "a Counter sale has exactly the original fields (no Retail fields)",
+    "a Counter sale has only the checkout payment fields (no Retail fields)",
   );
   ok(
     !(await page.locator("#receiptPanel").isVisible()),

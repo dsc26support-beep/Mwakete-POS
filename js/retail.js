@@ -180,6 +180,12 @@ const RetailCore = (() => {
     );
   };
   const WIDTH = 32;
+  const PAY_LABEL = {
+    eftpos: "EFTPOS/card",
+    internet_banking: "Internet banking",
+    mpaisa: "M-PAiSA",
+    other: "Other",
+  };
   const row = (left, right) => {
     const l = String(left),
       r = String(right);
@@ -215,11 +221,28 @@ const RetailCore = (() => {
       lines.push(row(label, "-" + money(sale.discount.amount)));
     }
     lines.push(row("TOTAL " + cur, money(sale.total)));
-    lines.push(
-      sale.paymentMethod === "cash"
-        ? "Paid: Cash"
-        : "Payment: " + sale.paymentMethod + " (recorded, NOT verified)",
-    );
+    if (Array.isArray(sale.payments) && sale.payments.length) {
+      for (const p of sale.payments) {
+        lines.push(
+          row(
+            p.method === "cash"
+              ? "Cash"
+              : (PAY_LABEL[p.method] || p.method) + " (NOT verified)",
+            money(p.amount),
+          ),
+        );
+        if (p.reference) lines.push("  ref " + p.reference);
+      }
+      if (sale.tendered !== undefined) {
+        lines.push(row("Cash received", money(sale.tendered)));
+        lines.push(row("Change", money(sale.change || 0)));
+      }
+    } else
+      lines.push(
+        sale.paymentMethod === "cash"
+          ? "Paid: Cash"
+          : "Payment: " + sale.paymentMethod + " (recorded, NOT verified)",
+      );
     lines.push(
       "Status: " + (sale.syncStatus || "pending") + " (saved on this device)",
     );

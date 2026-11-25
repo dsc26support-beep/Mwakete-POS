@@ -60,9 +60,32 @@
             <select id="salePriceList"><option value="">Base price</option></select>
           </div>
           <label class="field-label" for="paymentMethod">Payment method</label>
-          <select id="paymentMethod"><option value="cash">Cash</option><option value="other">Other (record only)</option></select>
+          <select id="paymentMethod"><option value="cash">Cash</option><option value="eftpos">EFTPOS / card (record only)</option><option value="internet_banking">Internet banking (record only)</option><option value="mpaisa">M-PAiSA (record only)</option><option value="other">Other (record only)</option></select>
+          <div id="tenderRow" class="retail-box">
+            <label class="field-label" for="cashTendered">Cash received</label>
+            <input id="cashTendered" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Leave empty if exact">
+            <p id="changeDue" class="hint" role="status" aria-live="polite"></p>
+          </div>
+          <div id="refRow" class="retail-box hidden">
+            <label class="field-label" for="payRef">Payment reference (optional)</label>
+            <input id="payRef" maxlength="40" placeholder="Transaction / receipt number from the payer">
+          </div>
+          <div class="retail-box">
+            <label class="check"><input id="splitOn" type="checkbox"> Split payment</label>
+            <div id="splitBox" class="hidden">
+              <label class="field-label" for="splitMethod">Also paid by</label>
+              <select id="splitMethod"><option value="eftpos">EFTPOS / card</option><option value="internet_banking">Internet banking</option><option value="mpaisa">M-PAiSA</option><option value="other">Other</option></select>
+              <label class="field-label" for="splitAmount">Amount paid this way</label>
+              <input id="splitAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+              <input id="splitRef" maxlength="40" placeholder="Reference (optional)" aria-label="Reference for the second payment">
+            </div>
+          </div>
           <button id="checkout" class="button primary full" disabled>Complete cash sale</button>
-          <p class="hint">Offline cash sales are saved on this device and queued for sync. “Other” payments are not verified by this app.</p>
+          <div class="inline">
+            <button id="holdSale" class="button" type="button" disabled>Hold sale</button>
+            <button id="resumeSale" class="button" type="button">Held sales (<span id="heldCount">0</span>)</button>
+          </div>
+          <p class="hint">Offline sales are saved on this device and queued for sync. EFTPOS, banking and M-PAiSA payments are only recorded: this app cannot verify them.</p>
         </aside>
       </div>
     </section>
@@ -425,6 +448,13 @@
       </form>
     </div>
   </div>
+  <div id="heldPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="heldTitle">
+    <div class="modal-card">
+      <h3 id="heldTitle">Held sales</h3>
+      <div id="heldList"></div>
+      <div class="modal-actions"><button class="button primary" type="button" id="heldClose">Close</button></div>
+    </div>
+  </div>
   <div id="receiptPanel" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt">
     <div class="modal-card">
       <div id="receiptBody"></div>
@@ -438,6 +468,7 @@
   <script src="./js/integrations/firebase-config.js"></script>
   <script src="./js/integrations/firebase.js"></script>
   <script src="./js/cloud-ui.js"></script>
+  <script src="./js/checkout.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -453,6 +484,7 @@
   <script src="./js/wholesale.js"></script>
   <script src="./js/wholesale-ui.js"></script>
   <script src="./js/invoices-ui.js"></script>
+  <script src="./js/checkout-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>
