@@ -1,32 +1,38 @@
-# Handoff — Mwakete POS Wholesale tier
-Branch: claude/beautiful-fermi-vdsx4j | Draft PR: dsc26support-beep/Mwakete-POS#4 (Wholesale PR 2 of 4). PR #1-#3 merged.
+# Handoff (live) — Mwakete POS + Firebase
 
 ## Goal
-3 tiers in one app (Counter/Retail/Wholesale). Wholesale in 4 PRs: 1 trade selling (merged), 2 invoices + credit ledger (PR #4, draft), 3 purchase orders, 4 quotes + delivery notes.
+Free 3-tier POS (Counter/Retail/Wholesale) for Kiribati. Firebase backend: Email/Password Auth + Firestore. Project `mwakete-pos`.
+User wants Firebase agent skills used for all Firebase work (plugin firebase@firebase installed, files in ~/.claude/plugins/marketplaces/firebase/skills; not registered as Skill tool until reload, read SKILL.md directly).
+
+## State (done + verified)
+- Web app registered: 1:648701661858:web:e96059c73228e578d43dfb (user's Android app ...android:a415bbcc... untouched; PWA can't use android ID).
+- Auth Email/Password enabled+deployed. Firestore Standard, australia-southeast1, rules+indexes deployed (compiled OK).
+- Hosting live: https://mwakete-pos.web.app (firebase.json hosting block, public=".", ignores tests/docs/*.md).
+- App: optional "Cloud account" panel (js/cloud-ui.js), adapter js/integrations/firebase.js (+firebase-config.js, public IDs only), sync.js picks FirebaseBackend when signed in else GoogleBackend.
+- Data: businesses/{ownerUid}/{sales,payments,customers}. Rules owner-only, append-only ledger, re-send ok only if identical.
+- npm test 147/147 pass. Live Chromium smoke test passed (signup, sale, synced, signout).
+- PR #1 (draft) dsc26support-beep/mwakete-pos -> main, branch claude/pensive-curie-l1iir1. Subscribed to PR events.
 
 ## Next steps
-1. User: merge PR #4 (not yet asked/answered).
-2. On go-ahead: plan PR 3 purchase orders / stock-in (suppliers, PO draft->ordered->received, goods-received idempotent by receipt id, append-only StockMovements sync). Then PR 4 quotes + delivery notes (quote->invoice conversion idempotent by quote id).
-3. USER must re-deploy google-apps-script/Code.gs (new app does NOT work with old server) and, only if accepting the risk, set script property LEDGER_ENABLED=true.
-4. Open: Messenger handle moote.nakau? Marketplace URL? Accountant review of tax treatment.
+1. Emulator rules tests (needs emulator download host allowed via update_environment).
+2. Items needing user/Cloud Console: restrict API key to domains; add authorized domains.
+3. Decisions pending: staff/cashier roles, require email verification, product sync, App Check (needs reCAPTCHA key).
 
-## State
-- PR #4 pushed (cb64bf5): js/invoices.js (pure), js/invoices-ui.js, Code.gs schema v2, sync.js rewritten (per-record), IndexedDB v4 (+payments), Accounts tab, guides g-invoices/g-ledger, docs. SW cache v8.
-- Tests: npm test 135/135; test:e2e tiers 41 + wholesale 54 + invoices 59 (real Code.gs via vm behind page.route). Not tested: deployed Apps Script, Android, printers.
-
-## Decisions (user chose)
-- Tax 12.5%, prices before tax, per-product exempt, Wholesale invoices only; discount reduces taxable base pro-rata; tax once per invoice, half-up, cents (BigInt).
-- Ledger NOT production-ready (Apps Script has no verified sign-in); off until owner sets LEDGER_ENABLED=true; credit limit owned by owner's Sheet (client only seeds); balances server-computed.
-- Over limit: warn + confirm, never block (offline). Payments against account balance, not per invoice.
-- Invoice stored ON the sale (atomic); sale.total = gross; reports subtract sale.tax.
-- Server answers per record; synced only when id returned; rejected kept with reason + Retry.
+## Decisions / why
+- Standard not Enterprise: Enterprise has no free quota; project must stay free.
+- Sydney region: closest to Kiribati; cannot change later.
+- Cloud sign-in optional: CLAUDE.md = offline-first, IndexedDB is queue, existing installs must keep working.
+- Firestore memory cache only (no 2nd offline store); setDoc resolve = server confirmed; timeout 20s leaves record pending.
+- Re-send rule (new data == stored) gives idempotent retries.
+- Balances read back from Firestore in integer cents.
 
 ## Gotchas
-- PostToolUse formatter reformats on Edit/Write: patch minified app.js/db.js/service-worker.js via exact-match python script in scratchpad (ruff clean); check git diff --stat.
-- Bash hook: max 500 chars/10 statements; `git push` blocked by sixth-sense, user authorised override -> run scratchpad push.sh.
-- Browser native min/max blocks submit before app validation: e2e sets form.noValidate. e2e needs NODE_PATH=$(npm root -g) for playwright.
-- `const X` in classic scripts is NOT window.X (expose explicitly). Bump SW CACHE + help.js appVersion on JS changes.
-- Stop hooks demand a push each time.
+- Bash hook limits: <=10 statements, <=500 chars; no inline python; write scripts to scratchpad.
+- CLI login via `login --no-localhost <code>` (done, admin@mwakete.com). Env `mwakete-pos` (env_01PVna8f56ygeMpw2TPk9Nyw) allowlists Firebase hosts + mwakete-pos.web.app + www.gstatic.com.
+- Remote default branch quirk: main did not exist remotely; user then authorised creating it (from 10235b7). User gave standing permission for branches/PRs; still ask before cost/deletes/GCP changes.
+- .firebase/ ignored via .gitignore.
+- Repo URL case: Mwakete-POS (push) vs mwakete-pos (API) both work.
 
-## Open questions
-- Merge PR #4? Plan PR 3? Messenger handle? Marketplace URL?
+## Open questions / user todo
+- Delete test account mwakete.smoketest.1795582984250@example.com (Console > Auth > Users) + its Firestore business doc.
+- Rules cannot verify sale total == line items (documented in SECURITY.md).
