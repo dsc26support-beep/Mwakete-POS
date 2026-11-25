@@ -262,6 +262,121 @@ const stamp = Date.now();
   );
   console.log("ok: credit notes synced from owner and cashier");
 
+  /* ----- stock movements, register shifts and purchase orders reach the cloud ----- */
+  const backedUp = (p, id) =>
+    p.waitForFunction(
+      (x) => /Backed up/.test(document.getElementById(x).textContent),
+      id,
+      { timeout: 30000 },
+    );
+  for (const [p, qty] of [
+    [owner, "5"],
+    [cash, "7"],
+  ]) {
+    await tab(p, "stock");
+    await p.selectOption("#stockAction", "receive");
+    await p.fill('#stockForm [name="qty"]', qty);
+    await p.click('#stockForm button[type="submit"]');
+    await p.waitForFunction(
+      () => /Backed up/.test(document.getElementById("stockMoves").textContent),
+      null,
+      { timeout: 30000 },
+    );
+    await tab(p, "register");
+    await p.fill('#registerOpenForm [name="float"]', "10");
+    await p.click('#registerOpenForm button[type="submit"]');
+    await p.waitForSelector("#registerOpen:not(.hidden)");
+    await p.fill('#registerCloseForm [name="counted"]', "10");
+    await p.click('#registerCloseForm button[type="submit"]');
+    await p.waitForSelector("#receiptPanel:not(.hidden)");
+    await p.click("#receiptClose");
+    await backedUp(p, "registerList");
+  }
+  const moveDocs =
+    (await rest("businesses/" + ownerUid + "/stockMoves")).documents || [];
+  assert.equal(
+    moveDocs.length,
+    2,
+    "both stock movements are in the owner's business",
+  );
+  assert.ok(
+    moveDocs.some(
+      (d) =>
+        d.fields.staffUid.stringValue === cashUid &&
+        d.fields.reason.stringValue === "purchase",
+    ),
+    "the cashier's movement carries their uid",
+  );
+  const shiftDocs =
+    (await rest("businesses/" + ownerUid + "/registers")).documents || [];
+  assert.equal(
+    shiftDocs.length,
+    2,
+    "both register shifts are in the owner's business",
+  );
+  assert.ok(
+    shiftDocs.every(
+      (d) =>
+        Number(
+          d.fields.difference.doubleValue ?? d.fields.difference.integerValue,
+        ) === 0,
+    ),
+  );
+  console.log(
+    "ok: stock movements and register shifts synced from owner and cashier",
+  );
+
+  await owner.evaluate(async () => {
+    await TierCore.setTier(POSDB, "wholesale");
+    await TierUI.apply();
+  });
+  await cash.evaluate(async () => {
+    await TierCore.setTier(POSDB, "wholesale");
+    await TierUI.apply();
+  });
+  assert.equal(
+    await cash.isHidden('[data-view="purchasing"]'),
+    true,
+    "cashiers do not get the Purchasing screen",
+  );
+  assert.equal(
+    await owner.isVisible('[data-view="purchasing"]'),
+    true,
+    "the owner does",
+  );
+  await tab(owner, "purchasing");
+  await owner.fill('#poForm [name="supplierName"]', "Pacific Traders");
+  await owner.fill("#poQty", "12");
+  await owner.fill("#poCost", "2.5");
+  await owner.click("#poAddLine");
+  await owner.click('#poForm button[type="submit"]');
+  await backedUp(owner, "poList");
+  let poDocs =
+    (await rest("businesses/" + ownerUid + "/purchaseOrders")).documents || [];
+  assert.equal(poDocs.length, 1);
+  assert.equal(poDocs[0].fields.status.stringValue, "draft");
+  await owner.click('[data-po-act="order"]');
+  await owner.waitForFunction(() =>
+    /Ordered/.test(document.getElementById("poList").textContent),
+  );
+  await backedUp(owner, "poList");
+  poDocs =
+    (await rest("businesses/" + ownerUid + "/purchaseOrders")).documents || [];
+  assert.equal(
+    poDocs[0].fields.status.stringValue,
+    "ordered",
+    "the order's new status reached the cloud",
+  );
+  assert.equal(
+    ((await rest("businesses/" + ownerUid + "/suppliers")).documents || [])
+      .length,
+    1,
+    "the supplier was backed up",
+  );
+  console.log(
+    "ok: purchase order and supplier synced; cashier has no Purchasing screen",
+  );
+
   /* ----- owner removes the cashier's access ----- */
   await tab(owner, "setup");
   await owner.click("#staffList [data-staff]");

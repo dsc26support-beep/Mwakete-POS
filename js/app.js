@@ -26,6 +26,8 @@ async function refresh() {
   $("settingsForm").elements.apiUrl.value = map.apiUrl || "";
   if (window.RetailUI) await RetailUI.render();
   if (window.RegisterUI) await RegisterUI.render();
+  if (window.StockUI) await StockUI.render();
+  if (window.PurchasingUI) await PurchasingUI.render();
 }
 function renderProducts() {
   const q = $("productSearch").value.toLowerCase().trim(),
@@ -287,6 +289,8 @@ window.addEventListener("offline", connection);
   await InvoiceUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
+  await StockUI.init();
+  await PurchasingUI.init();
   await HelpCentre.init();
   await CloudUI.init();
   connection();

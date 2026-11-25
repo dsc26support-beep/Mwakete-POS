@@ -81,6 +81,10 @@ const CloudUI = (() => {
     // Cashiers cannot edit the catalogue (the cloud rules enforce it; this just hides the form).
     const pf = $("productForm");
     if (pf) pf.classList.toggle("hidden", cashier);
+    // Screens that are the owner's business (purchasing) are hidden from cashiers; the rules refuse them anyway.
+    document
+      .querySelectorAll("[data-owner-only]")
+      .forEach((el) => el.classList.toggle("role-hidden", cashier));
     renderStaff();
   }
 

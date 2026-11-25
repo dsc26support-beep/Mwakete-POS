@@ -29,6 +29,8 @@
       <button class="tab hidden" data-view="accounts" data-feature="invoices">Accounts</button>
       <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
       <button class="tab hidden" data-view="register" data-feature="register">Register</button>
+      <button class="tab hidden" data-view="stock" data-feature="stock">Stock</button>
+      <button class="tab hidden" data-view="purchasing" data-feature="purchaseOrders" data-owner-only>Purchasing</button>
       <button class="tab" data-view="setup">Business setup</button>
       <button class="tab" data-view="help">Help &amp; guides</button>
     </nav>
@@ -119,6 +121,51 @@
         </div>
       </div>
       <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Past shifts</h2></div></div><div id="registerList"></div></div>
+    </section>
+    <section id="view-stock" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">INVENTORY</p><h2>Stock</h2></div></div>
+        <p class="hint">Stock is counted on <strong>this device</strong>. Every change made here is saved with a reason, so you can always see what happened. Sales and refunds adjust stock automatically.</p>
+        <form id="stockForm" class="settings-form">
+          <label>Product<select name="product" id="stockProduct" required></select></label>
+          <label>What happened<select name="action" id="stockAction"></select></label>
+          <label><span id="stockQtyLabel">Quantity</span><input name="qty" type="number" inputmode="numeric" min="0" step="1" required></label>
+          <label>Note (optional)<input name="note" maxlength="200" placeholder="For example: box dropped"></label>
+          <p id="stockPreview" class="muted" role="status" aria-live="polite"></p>
+          <button class="button primary" type="submit">Save stock change</button>
+        </form>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Stock movements</h2></div></div><div id="stockMoves"></div></div>
+    </section>
+    <section id="view-purchasing" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">WHOLESALE</p><h2>Purchase orders</h2></div></div>
+        <p class="hint">Order stock from a supplier, then press <strong>Receive stock</strong> when it arrives. Receiving adds the quantities to this device's stock and records each one. A received or cancelled order cannot be changed.</p>
+        <form id="poForm" class="settings-form">
+          <label>Supplier<input name="supplierName" maxlength="100" list="supplierNames" autocomplete="off" required placeholder="Choose or type a name"></label>
+          <datalist id="supplierNames"></datalist>
+          <div id="poLines" aria-live="polite"></div>
+          <fieldset class="po-add"><legend>Add a product to the order</legend>
+            <label>Product<select id="poProduct"></select></label>
+            <label>Quantity<input id="poQty" type="number" inputmode="numeric" min="1" step="1"></label>
+            <label>Cost each<input id="poCost" type="number" inputmode="decimal" min="0" step="0.01"></label>
+            <button class="button secondary" type="button" id="poAddLine">Add to order</button>
+          </fieldset>
+          <label>Note (optional)<input name="note" maxlength="200"></label>
+          <p id="poTotal" class="muted" role="status">Order total: 0.00</p>
+          <button class="button primary" type="submit">Save as draft</button>
+        </form>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">ORDERS</p><h2>Your purchase orders</h2></div></div><div id="poList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">SUPPLIERS</p><h2>Suppliers</h2></div></div>
+        <form id="supplierForm" class="settings-form">
+          <label>Name<input name="name" maxlength="100" required></label>
+          <label>Phone (optional)<input name="phone" maxlength="40"></label>
+          <label>Note (optional)<input name="note" maxlength="200"></label>
+          <button class="button secondary" type="submit">Add supplier</button>
+        </form>
+        <div id="supplierList"></div>
+      </div>
     </section>
     <section id="view-customers" class="view hidden">
       <div class="panel">
@@ -325,6 +372,7 @@
   <script src="./js/cloud-ui.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
+  <script src="./js/stock.js"></script>
   <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
@@ -334,6 +382,8 @@
   <script src="./js/invoices-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
+  <script src="./js/stock-ui.js"></script>
+  <script src="./js/purchasing-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
