@@ -110,4 +110,5 @@ Mwakete sellers must use the existing Mwakete identity, customer and inventory s
 - **SDK:** Firebase v11.10.0 loads from Google's CDN on demand, so the app still starts offline.
 - **Deploy:** `npx -y firebase-tools@latest deploy --only auth,firestore --project mwakete-pos`
 - **IDs:** Web app `1:648701661858:web:e96059c73228e578d43dfb` (used by this PWA). Android app `1:648701661858:android:a415bbcc6cb9df9cd43dfb` is registered in the same project but not used by this PWA.
-- **Not built yet:** product sync, staff roles, email verification, App Check, emulator-based rules tests. See `SECURITY.md`.
+- **Rules tests (Firestore emulator, needs Java 11+):** `cd tests/rules && npm install && npm test`. 11 tests cover owner-only access, append-only ledger, idempotent re-send, field validation and default deny. They are separate from `npm test`, which stays dependency-free.
+- **Not built yet:** product sync, staff roles, email verification, App Check. See `SECURITY.md`.
