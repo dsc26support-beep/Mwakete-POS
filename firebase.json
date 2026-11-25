@@ -9,5 +9,34 @@
     "indexes": "firestore.indexes.json",
     "database": "(default)",
     "location": "australia-southeast1"
+  },
+  "hosting": {
+    "site": "mwakete-pos",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "package.json",
+      "**/.*",
+      "**/node_modules/**",
+      "tests/**",
+      "docs/**",
+      "google-apps-script/**",
+      "*.md"
+    ],
+    "headers": [
+      {
+        "source": "/service-worker.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        ]
+      }
+    ]
   }
 }
