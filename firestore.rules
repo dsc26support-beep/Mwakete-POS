@@ -42,8 +42,13 @@ rules_version = '2';
 //   - total: number (required, 0 .. 1,000,000,000)
 //   - paymentMethod: string (required, max 30 chars)
 //   - currency, customerId: string (optional)
-//   - paymentVerified: bool (optional)
-//   - any other POS fields (discount, tax, invoice, ...): allowed, max 40 fields in total
+//   - paymentVerified: bool (optional; may be true only when paymentMethod is "cash")
+//   - tier (counter|retail|wholesale), subtotal, tax: money numbers (optional)
+//   - discount: map with a money "amount" (optional)
+//   - invoice: map {mode: paid|account, total (must equal the sale total), number, ...} (optional;
+//     an invoice on account must also carry customerId)
+//   - createdAt must be > 0 and at most 7 days after the server time (wrong device clocks tolerated)
+//   - any other POS fields: allowed, max 40 fields in total
 //
 // Collection: businesses/{id}/payments   (append-only ledger)
 // Document ID: the payment's unique ID (same as the "id" field)
@@ -105,6 +110,35 @@ service cloud.firestore {
       return request.resource.data.staffUid == request.auth.uid;
     }
 
+    // Record timestamps (ms since epoch) must be positive and at most 7 days ahead of the server
+    // clock, so a device with a wrong clock still works but records cannot be dated far in the future.
+    function validTime(ts) {
+      return ts is number && ts > 0 && ts <= request.time.toMillis() + 604800000;
+    }
+
+    function validDiscount(disc) {
+      return disc is map && disc.amount is number && disc.amount >= 0 && disc.amount <= 1000000000;
+    }
+
+    // A tax invoice carried on a sale. Its total must equal the sale total, and an invoice on account
+    // must name the customer, so a forged invoice cannot disagree with the sale it sits on.
+    function validInvoice(d) {
+      let inv = d.invoice;
+      return inv is map
+        && inv.keys().hasAll(['mode', 'total', 'number'])
+        && inv.keys().size() <= 20
+        && inv.mode in ['paid', 'account']
+        && isMoney(inv.total)
+        && inv.total == d.total
+        && isShortString(inv.number, 64)
+        && (inv.mode != 'account' || 'customerId' in d)
+        && (!('tax' in inv) || isMoney(inv.tax))
+        && (!('customerName' in inv) || (inv.customerName is string && inv.customerName.size() <= 100))
+        && (!('customerTaxNumber' in inv) || (inv.customerTaxNumber is string && inv.customerTaxNumber.size() <= 200))
+        && (!('sellerTaxNumber' in inv) || (inv.sellerTaxNumber is string && inv.sellerTaxNumber.size() <= 200))
+        && (!('terms' in inv) || (inv.terms is string && inv.terms.size() <= 200));
+    }
+
     // ===============================================================
     // Validator Functions
     // ===============================================================
@@ -115,7 +149,7 @@ service cloud.firestore {
         && d.keys().hasOnly(['ownerUid', 'name', 'createdAt', 'currency', 'tier', 'updatedAt'])
         && d.ownerUid == businessId
         && isShortString(d.name, 100)
-        && d.createdAt is number
+        && validTime(d.createdAt)
         && (!('currency' in d) || (d.currency is string && d.currency.size() <= 8))
         && (!('tier' in d) || d.tier in ['counter', 'retail', 'wholesale'])
         && (!('updatedAt' in d) || d.updatedAt is number);
@@ -126,6 +160,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['uid', 'name', 'role', 'active', 'createdAt'])
         && d.keys().hasAll(['uid', 'name', 'role', 'active', 'createdAt'])
         && d.uid == staffId
+        && isShortString(staffId, 128)
         && staffId != businessId
         && isShortString(d.name, 100)
         && d.role == 'cashier'
@@ -140,13 +175,21 @@ service cloud.firestore {
         && d.id == saleId
         && isShortString(d.id, 64)
         && isShortString(d.staffUid, 128)
-        && d.createdAt is number
+        && validTime(d.createdAt)
         && d.items is list && d.items.size() >= 1 && d.items.size() <= 200
         && isMoney(d.total)
         && isShortString(d.paymentMethod, 30)
         && (!('currency' in d) || (d.currency is string && d.currency.size() <= 8))
         && (!('customerId' in d) || isShortString(d.customerId, 64))
-        && (!('paymentVerified' in d) || d.paymentVerified is bool);
+        && (!('paymentVerified' in d) || d.paymentVerified is bool)
+        // A recorded non-cash payment is never "verified" (nothing here confirms a digital payment).
+        && (d.paymentMethod == 'cash' || !('paymentVerified' in d) || d.paymentVerified == false)
+        && (!('tier' in d) || d.tier in ['counter', 'retail', 'wholesale'])
+        && (!('subtotal' in d) || isMoney(d.subtotal))
+        && (!('tax' in d) || isMoney(d.tax))
+        && (!('syncStatus' in d) || (d.syncStatus is string && d.syncStatus.size() <= 20))
+        && (!('discount' in d) || validDiscount(d.discount))
+        && (!('invoice' in d) || validInvoice(d));
     }
 
     function validPayment(paymentId) {
@@ -158,7 +201,7 @@ service cloud.firestore {
         && isShortString(d.staffUid, 128)
         && isShortString(d.customerId, 64)
         && d.amount is number && d.amount > 0 && d.amount <= 1000000000
-        && d.createdAt is number
+        && validTime(d.createdAt)
         && (!('method' in d) || isShortString(d.method, 30))
         && (!('note' in d) || (d.note is string && d.note.size() <= 500));
     }

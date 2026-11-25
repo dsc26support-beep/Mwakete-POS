@@ -45,12 +45,15 @@ const invoiceSale = (id, by = OWNER) =>
     paymentMethod: "account",
     paymentVerified: false,
     subtotal: 100,
-    discount: 0,
+    discount: { type: "percent", value: 10, amount: 11.11 },
     total: 112.5,
-    tax: { rate: 12.5, amount: 12.5 },
+    tax: 12.5,
     invoice: {
       number: "INV-A1-1",
       mode: "account",
+      taxRate: 12.5,
+      taxableNet: 100,
+      tax: 12.5,
       total: 112.5,
       customerName: "Trade Co",
       sellerTaxNumber: "T-1",
@@ -268,6 +271,155 @@ test("sales: a record must be stamped with the writer's own uid (no impersonatio
     setDoc(
       ref(db(CASHIER), "businesses", OWNER, "sales", "s1"),
       sale("s1", OWNER),
+    ),
+  );
+});
+
+/* ---------- audit hardening: types, invoices, verified payments, timestamps ---------- */
+test("sales: optional fields are type-checked (tier, subtotal, tax, discount, syncStatus)", async () => {
+  const w = (id, data) =>
+    setDoc(ref(db(OWNER), "businesses", OWNER, "sales", id), data);
+  await assertSucceeds(
+    w(
+      "t1",
+      sale("t1", OWNER, {
+        tier: "retail",
+        subtotal: 5,
+        tax: 0,
+        syncStatus: "pending",
+      }),
+    ),
+  );
+  await assertFails(w("t2", sale("t2", OWNER, { tier: "platinum" })));
+  await assertFails(w("t2", sale("t2", OWNER, { subtotal: "5" })));
+  await assertFails(w("t2", sale("t2", OWNER, { subtotal: -1 })));
+  await assertFails(w("t2", sale("t2", OWNER, { tax: { amount: 1 } })));
+  await assertFails(w("t2", sale("t2", OWNER, { syncStatus: "x".repeat(21) })));
+  await assertFails(w("t2", sale("t2", OWNER, { discount: 5 })));
+  await assertFails(w("t2", sale("t2", OWNER, { discount: { amount: "5" } })));
+  await assertFails(w("t2", sale("t2", OWNER, { discount: { amount: -1 } })));
+  await assertSucceeds(
+    w(
+      "t3",
+      sale("t3", OWNER, { discount: { type: "fixed", value: 1, amount: 1 } }),
+    ),
+  );
+});
+
+test("sales: an invoice must agree with the sale and be well formed", async () => {
+  const w = (id, data) =>
+    setDoc(ref(db(OWNER), "businesses", OWNER, "sales", id), data);
+  const inv = (over = {}) => ({ ...invoiceSale("x").invoice, ...over });
+  await assertSucceeds(w("i1", invoiceSale("i1")));
+  // total on the invoice differs from the sale's total (a forged balance)
+  await assertFails(
+    w("i2", { ...invoiceSale("i2"), invoice: inv({ total: 1 }) }),
+  );
+  await assertFails(
+    w("i3", { ...invoiceSale("i3"), invoice: inv({ total: "112.5" }) }),
+  );
+  await assertFails(
+    w("i4", { ...invoiceSale("i4"), invoice: inv({ mode: "gift" }) }),
+  );
+  await assertFails(
+    w("i5", { ...invoiceSale("i5"), invoice: inv({ number: "" }) }),
+  );
+  await assertFails(
+    w("i6", { ...invoiceSale("i6"), invoice: inv({ tax: "x" }) }),
+  );
+  await assertFails(
+    w("i7", {
+      ...invoiceSale("i7"),
+      invoice: inv({ customerName: "n".repeat(101) }),
+    }),
+  );
+  await assertFails(w("i8", { ...invoiceSale("i8"), invoice: "INV-1" }));
+  const { number, ...noNumber } = inv();
+  await assertFails(w("i9", { ...invoiceSale("i9"), invoice: noNumber }));
+  // an invoice on account must name the customer
+  const { customerId, ...noCustomer } = invoiceSale("i10");
+  await assertFails(w("i10", noCustomer));
+  // a paid invoice does not need one
+  await assertSucceeds(
+    w("i11", {
+      ...noCustomer,
+      id: "i11",
+      paymentMethod: "cash",
+      paymentVerified: true,
+      invoice: inv({ mode: "paid" }),
+    }),
+  );
+});
+
+test("sales: a non-cash payment can never be recorded as verified", async () => {
+  const w = (id, data) =>
+    setDoc(ref(db(OWNER), "businesses", OWNER, "sales", id), data);
+  await assertSucceeds(
+    w(
+      "v1",
+      sale("v1", OWNER, { paymentMethod: "cash", paymentVerified: true }),
+    ),
+  );
+  await assertSucceeds(
+    w(
+      "v2",
+      sale("v2", OWNER, { paymentMethod: "other", paymentVerified: false }),
+    ),
+  );
+  const { paymentVerified, ...none } = sale("v3", OWNER, {
+    paymentMethod: "other",
+  });
+  await assertSucceeds(w("v3", none));
+  await assertFails(
+    w(
+      "v4",
+      sale("v4", OWNER, { paymentMethod: "other", paymentVerified: true }),
+    ),
+  );
+  await assertFails(
+    w(
+      "v5",
+      sale("v5", OWNER, { paymentMethod: "account", paymentVerified: true }),
+    ),
+  );
+});
+
+test("timestamps: positive and at most 7 days ahead; sales, payments and business", async () => {
+  const day = 86400000;
+  const w = (id, data) =>
+    setDoc(ref(db(OWNER), "businesses", OWNER, "sales", id), data);
+  await assertSucceeds(
+    w("c1", sale("c1", OWNER, { createdAt: Date.now() + day })),
+  );
+  await assertFails(
+    w("c2", sale("c2", OWNER, { createdAt: Date.now() + 30 * day })),
+  );
+  await assertFails(w("c3", sale("c3", OWNER, { createdAt: 0 })));
+  await assertFails(w("c4", sale("c4", OWNER, { createdAt: -5 })));
+  await assertFails(w("c5", sale("c5", OWNER, { createdAt: "now" })));
+  await assertFails(
+    setDoc(
+      ref(db(OWNER), "businesses", OWNER, "payments", "p1"),
+      payment("p1", OWNER, { createdAt: Date.now() + 30 * day }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      ref(db(OWNER), "businesses", OWNER),
+      business({ createdAt: Date.now() + 30 * day }),
+    ),
+  );
+});
+
+test("staff: the staff ID is length limited", async () => {
+  const long = "s".repeat(129);
+  await assertFails(
+    setDoc(ref(db(OWNER), "businesses", OWNER, "staff", long), staff(long)),
+  );
+  await assertSucceeds(
+    setDoc(
+      ref(db(OWNER), "businesses", OWNER, "staff", "s".repeat(128)),
+      staff("s".repeat(128)),
     ),
   );
 });
