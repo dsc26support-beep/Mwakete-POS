@@ -214,16 +214,16 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 ## L. Reports and analytics
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
-| POS-163 | Daily sales report | Partial | |
-| POS-164 | Weekly sales report | Missing | |
-| POS-165 | Monthly sales report | Missing | |
-| POS-166 | Custom date reports | Missing | |
-| POS-167 | Sales by product | Verified | |
-| POS-168 | Sales by category | Verified | |
-| POS-169 | Sales by cashier | Verified | cloud report |
-| POS-170 | Sales by payment method | Verified | cloud report |
-| POS-171 | Inventory report | Partial | |
-| POS-172 | Profit reporting | Missing | needs cost price |
+| POS-163 | Daily sales report | Verified | Today / Yesterday presets (js/analytics.js; tests/analytics.test.js; e2e/analytics). Retail and Wholesale editions |
+| POS-164 | Weekly sales report | Verified | This week (Monday to today), Last week (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-165 | Monthly sales report | Verified | This month, Last month (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-166 | Custom date reports | Verified | custom dates, validated, at most one year (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-167 | Sales by product | Verified | by product with category/payment/staff/edition filters (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-168 | Sales by category | Verified | by category (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-169 | Sales by cashier | Verified | by staff on this device's records; whole business in the cloud report (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-170 | Sales by payment method | Verified | by payment method, split sales spread across methods (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-171 | Inventory report | Partial | stock valuation and alerts on the Products screen; no printed inventory report |
+| POS-172 | Profit reporting | Partial | estimate from today's cost price for costed products only; assumptions printed on the report (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
 
 ## M. Device, installability and interface
 | Capability | Status | Evidence / gap |

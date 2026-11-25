@@ -25,6 +25,7 @@ async function refresh() {
   $("settingsForm").elements.currency.value = map.currency || "AUD";
   $("settingsForm").elements.apiUrl.value = map.apiUrl || "";
   if (window.RetailUI) await RetailUI.render();
+  if (window.AnalyticsUI) await AnalyticsUI.render();
   if (window.RegisterUI) await RegisterUI.render();
   if (window.StockUI) await StockUI.render();
   if (window.QuotesUI) await QuotesUI.render();
@@ -397,6 +398,7 @@ window.addEventListener("offline", connection);
   await CatalogueUI.init();
   await TxnUI.init();
   await DeliveryUI.init();
+  await AnalyticsUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

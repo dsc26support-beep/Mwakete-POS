@@ -315,6 +315,22 @@
         <div class="section-heading"><div><p class="eyebrow">RETAIL</p><h2>Reports</h2></div></div>
         <div id="reportBody"></div>
       </div>
+      <div class="panel" id="periodReportPanel">
+        <div class="section-heading"><div><p class="eyebrow">THIS DEVICE</p><h2>Report by period</h2></div></div>
+        <div class="filter-row">
+          <label class="sr-only" for="repPeriod">Period</label>
+          <select id="repPeriod"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="week" selected>This week</option><option value="lastweek">Last week</option><option value="month">This month</option><option value="lastmonth">Last month</option><option value="custom">Custom dates</option></select>
+          <input id="repFrom" type="date" aria-label="From date" class="hidden">
+          <input id="repTo" type="date" aria-label="To date" class="hidden">
+          <select id="repCategory" aria-label="Category"><option value="">All categories</option></select>
+          <select id="repMethod" aria-label="Payment method"><option value="">Any payment</option><option value="cash">Cash</option><option value="eftpos">EFTPOS / card</option><option value="internet_banking">Internet banking</option><option value="mpaisa">M-PAiSA</option><option value="other">Other</option><option value="account">On account</option></select>
+          <select id="repStaff" aria-label="Staff"><option value="">All staff</option></select>
+          <select id="repEdition" aria-label="Edition"><option value="">All editions</option><option value="counter">Counter</option><option value="retail">Retail</option><option value="wholesale">Wholesale</option></select>
+        </div>
+        <p id="repError" class="low" role="alert"></p>
+        <div class="row-actions"><button id="repPrint" class="button secondary" type="button">Print</button><button id="repCsv" class="button secondary" type="button">Export CSV</button></div>
+        <div id="periodReportBody" aria-live="polite"></div>
+      </div>
       <div class="panel" id="cloudReportPanel" data-owner-only>
         <div class="section-heading"><div><p class="eyebrow">CLOUD ACCOUNT</p><h2>Whole business</h2></div></div>
         <p class="hint">Adds up the sales and credit notes of <strong>every till and cashier</strong> from your cloud account. It needs an internet connection and a signed-in, verified account. Sales still waiting to sync from a device are not included yet.</p>
@@ -539,6 +555,7 @@
   <script src="./js/catalogue.js"></script>
   <script src="./js/txn.js"></script>
   <script src="./js/delivery.js"></script>
+  <script src="./js/analytics.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -558,6 +575,7 @@
   <script src="./js/catalogue-ui.js"></script>
   <script src="./js/txn-ui.js"></script>
   <script src="./js/delivery-ui.js"></script>
+  <script src="./js/analytics-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>
