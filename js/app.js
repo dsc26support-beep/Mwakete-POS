@@ -25,6 +25,7 @@ async function refresh() {
   $("settingsForm").elements.currency.value = map.currency || "AUD";
   $("settingsForm").elements.apiUrl.value = map.apiUrl || "";
   if (window.RetailUI) await RetailUI.render();
+  if (window.RegisterUI) await RegisterUI.render();
 }
 function renderProducts() {
   const q = $("productSearch").value.toLowerCase().trim(),
@@ -285,6 +286,7 @@ window.addEventListener("offline", connection);
   await WholesaleUI.init();
   await InvoiceUI.init();
   await RefundsUI.init();
+  await RegisterUI.init();
   await HelpCentre.init();
   await CloudUI.init();
   connection();

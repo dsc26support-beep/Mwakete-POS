@@ -28,6 +28,7 @@
       <button class="tab hidden" data-view="pricelists" data-feature="priceTiers">Price lists</button>
       <button class="tab hidden" data-view="accounts" data-feature="invoices">Accounts</button>
       <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
+      <button class="tab hidden" data-view="register" data-feature="register">Register</button>
       <button class="tab" data-view="setup">Business setup</button>
       <button class="tab" data-view="help">Help &amp; guides</button>
     </nav>
@@ -95,6 +96,29 @@
     <section id="view-sales" class="view hidden">
       <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div><div id="salesList"></div></div>
       <div class="panel hidden" data-feature="refunds"><div class="section-heading"><div><p class="eyebrow">CREDIT NOTES</p><h2>Refunds and returns</h2></div></div><p class="hint">Open a sale and press <strong>Refund…</strong>. A refund never changes the original sale; it is recorded as a credit note. Credit notes reach your cloud account when you are signed in.</p><div id="refundsList"></div></div>
+    </section>
+    <section id="view-register" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">CASH DRAWER</p><h2>Register</h2></div></div>
+        <p class="hint">Count the cash in the drawer when you start and when you finish. The app works out what should be there from <strong>this device's</strong> cash sales, payments and refunds. Selling is never blocked when the register is closed.</p>
+        <div id="registerClosed">
+          <form id="registerOpenForm" class="settings-form">
+            <label>Opening float (cash in the drawer now)<input name="float" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+            <button class="button primary" type="submit">Open register</button>
+          </form>
+        </div>
+        <div id="registerOpen" class="hidden">
+          <p id="registerSince" class="muted"></p>
+          <div id="registerLive"></div>
+          <form id="registerCloseForm" class="settings-form">
+            <label>Cash counted in the drawer<input name="counted" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+            <label>Note (optional)<input name="note" maxlength="200" placeholder="For example: coin short"></label>
+            <p id="registerDiff" class="muted" role="status" aria-live="polite"></p>
+            <button class="button primary" type="submit">Close register</button>
+          </form>
+        </div>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Past shifts</h2></div></div><div id="registerList"></div></div>
     </section>
     <section id="view-customers" class="view hidden">
       <div class="panel">
@@ -300,6 +324,7 @@
   <script src="./js/integrations/firebase.js"></script>
   <script src="./js/cloud-ui.js"></script>
   <script src="./js/refunds.js"></script>
+  <script src="./js/register.js"></script>
   <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
@@ -308,6 +333,7 @@
   <script src="./js/wholesale-ui.js"></script>
   <script src="./js/invoices-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
+  <script src="./js/register-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
