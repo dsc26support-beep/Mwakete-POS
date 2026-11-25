@@ -38,4 +38,13 @@ Before production:
 - Payments are cash only and are recorded by a cashier on the device; there is no verification that cash was received and no staff roles or audit trail yet. Anyone using the device can record a payment or invoice.
 - Unresolved before production: authenticated identity, tenant validation, audit log, roles (owner vs cashier), credit notes/refunds and voiding, tax-law review of invoice wording and rounding (12.5% on the discounted taxable amount, rounded half up once per invoice), and a statement/reconciliation process.
 
+## Firebase cloud account (Email/Password + Firestore)
+- **Optional.** The app works fully offline without it. IndexedDB remains the offline queue; Firestore is the cloud ledger. Firestore runs with its default in-memory cache only (no second offline store).
+- **Identity:** Firebase Authentication, Email/Password, project `mwakete-pos`. Passwords never touch this app's code or storage; Firebase handles them. Password reset uses Firebase's email link. Email verification is **not** required yet.
+- **Tenancy:** each business lives at `businesses/{ownerUid}`. `firestore.rules` allow only that signed-in user to read or write it; everything else is denied by default. Independent-business data is separate from Mwakete Marketplace data, and nothing here touches the marketplace backend.
+- **Append-only ledger:** `sales` and `payments` can be created but never deleted. A re-send is accepted only if identical to the stored record, so retries are idempotent and stored records cannot be altered. `customers` can be edited by the owner but never deleted.
+- **Synced means confirmed:** a record is marked synced only after Firestore confirms the write. A rules refusal is kept as "rejected" with a reason. A timeout or network error leaves the record pending.
+- **Public web config:** `js/integrations/firebase-config.js` holds public identifiers, not secrets. Restrict the API key to the app's domains in Google Cloud Console and keep the rules deployed. Never commit service-account keys or admin credentials.
+- **Known limits (production blockers):** rules cannot verify that a sale's total equals its line items, so the owner's own app is trusted for prices; there are no staff or cashier roles (one login owns the business); the rules were compile-checked by Firebase and pattern-checked in unit tests but not run against the emulator; no App Check; no email verification.
+
 Report vulnerabilities privately to the repository owner. Do not publish exploit details before a fix is available.

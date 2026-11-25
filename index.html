@@ -181,6 +181,21 @@
           <button class="button primary" type="submit">Save settings</button>
         </form>
         <div class="notice"><strong>Google connection safety</strong><p>Never enter your Google password here. The production Google sign-in and automatic spreadsheet / Apps Script provisioning flow requires a verified Google OAuth client and deployment configuration. This starter does not pretend that provisioning is already active.</p></div>
+        <div class="panel" id="cloudPanel">
+          <p class="eyebrow">CLOUD ACCOUNT</p><h3>Back up and sync with your email</h3>
+          <p class="muted">Optional and free. Sales are always saved on this device first, and are sent to your private cloud account when you are online and signed in. Never use your email password here: choose a new password for this app.</p>
+          <p id="cloudStatus" class="muted" role="status">Not signed in.</p>
+          <form id="cloudForm" class="settings-form" novalidate>
+            <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+            <label>Password (at least 8 characters)<input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128"></label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="button primary" type="submit" id="cloudSignIn">Sign in</button>
+              <button class="button secondary" type="button" id="cloudSignUp">Create account</button>
+              <button class="button secondary" type="button" id="cloudReset">Forgot password</button>
+            </div>
+          </form>
+          <button class="button secondary hidden" type="button" id="cloudSignOut">Sign out</button>
+        </div>
         <div class="notice"><strong>Mwakete Marketplace connection</strong><p>The Mwakete adapter is a documented integration boundary. It must be connected to verified existing Mwakete authentication and APIs before marketplace accounts or live inventory are enabled.</p></div>
       </div>
     </section>
@@ -232,6 +247,9 @@
   <script src="./js/db.js"></script>
   <script src="./js/integrations/google.js"></script>
   <script src="./js/integrations/mwakete.js"></script>
+  <script src="./js/integrations/firebase-config.js"></script>
+  <script src="./js/integrations/firebase.js"></script>
+  <script src="./js/cloud-ui.js"></script>
   <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>

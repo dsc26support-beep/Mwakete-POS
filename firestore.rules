@@ -1,0 +1,171 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// One business per Firebase Authentication user. The business document ID is the
+// owner's uid, so a signed-in user can only ever reach their own business.
+//
+// Collection: businesses
+// Document ID: {ownerUid}
+// Fields:
+//   - ownerUid: string (required, must equal the document ID and request.auth.uid, immutable)
+//   - name: string (required, 1-100 chars)
+//   - createdAt: number (required, ms since epoch, immutable)
+//   - currency: string (optional, max 8 chars)
+//   - tier: string (optional: counter | retail | wholesale)
+//   - updatedAt: number (optional)
+//
+// Collection: businesses/{ownerUid}/sales      (append-only ledger)
+// Document ID: the sale's unique transaction ID (same as the "id" field)
+// Fields:
+//   - id: string (required, equals document ID, max 64 chars)
+//   - createdAt: number (required)
+//   - items: list (required, 1-200 line items)
+//   - total: number (required, 0 .. 1,000,000,000)
+//   - paymentMethod: string (required, max 30 chars)
+//   - currency, customerId, tier: string (optional)
+//   - paymentVerified: bool (optional)
+//   - any other POS fields (discount, tax, invoice, ...): allowed, max 40 fields in total
+//
+// Collection: businesses/{ownerUid}/payments   (append-only ledger)
+// Document ID: the payment's unique ID (same as the "id" field)
+// Fields:
+//   - id: string (required, equals document ID)
+//   - customerId: string (required, max 64 chars)
+//   - amount: number (required, > 0 and <= 1,000,000,000)
+//   - createdAt: number (required)
+//   - method, note: string (optional)
+//
+// Collection: businesses/{ownerUid}/customers  (mutable)
+// Document ID: the customer's unique ID (same as the "id" field)
+// Fields:
+//   - id: string (required, equals document ID)
+//   - name: string (required, 1-100 chars)
+//   - creditLimit: number (optional, >= 0), terms, taxNumber: string (optional)
+//
+// Not enforced here (Firestore rules cannot loop over line items): that a sale's
+// total equals its line items. Prices are chosen by the business's own app, and
+// only the owner can write to their own business.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // The signed-in user owns the business whose document ID is the uid.
+    function isOwner(businessId) {
+      return isSignedIn() && request.auth.uid == businessId;
+    }
+
+    function isShortString(value, maxLen) {
+      return value is string && value.size() >= 1 && value.size() <= maxLen;
+    }
+
+    function isMoney(value) {
+      return value is number && value >= 0 && value <= 1000000000;
+    }
+
+    // ===============================================================
+    // Validator Functions
+    // ===============================================================
+
+    function validBusiness(businessId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerUid', 'name', 'createdAt'])
+        && d.keys().hasOnly(['ownerUid', 'name', 'createdAt', 'currency', 'tier', 'updatedAt'])
+        && d.ownerUid == businessId
+        && isShortString(d.name, 100)
+        && d.createdAt is number
+        && (!('currency' in d) || (d.currency is string && d.currency.size() <= 8))
+        && (!('tier' in d) || d.tier in ['counter', 'retail', 'wholesale'])
+        && (!('updatedAt' in d) || d.updatedAt is number);
+    }
+
+    function validSale(saleId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'createdAt', 'items', 'total', 'paymentMethod'])
+        && d.keys().size() <= 40
+        && d.id == saleId
+        && isShortString(d.id, 64)
+        && d.createdAt is number
+        && d.items is list && d.items.size() >= 1 && d.items.size() <= 200
+        && isMoney(d.total)
+        && isShortString(d.paymentMethod, 30)
+        && (!('currency' in d) || (d.currency is string && d.currency.size() <= 8))
+        && (!('customerId' in d) || isShortString(d.customerId, 64))
+        && (!('paymentVerified' in d) || d.paymentVerified is bool);
+    }
+
+    function validPayment(paymentId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'customerId', 'amount', 'createdAt'])
+        && d.keys().size() <= 20
+        && d.id == paymentId
+        && isShortString(d.id, 64)
+        && isShortString(d.customerId, 64)
+        && d.amount is number && d.amount > 0 && d.amount <= 1000000000
+        && d.createdAt is number
+        && (!('method' in d) || isShortString(d.method, 30))
+        && (!('note' in d) || (d.note is string && d.note.size() <= 500));
+    }
+
+    function validCustomer(customerId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'name'])
+        && d.keys().hasOnly(['id', 'name', 'creditLimit', 'terms', 'taxNumber'])
+        && d.id == customerId
+        && isShortString(d.id, 64)
+        && isShortString(d.name, 100)
+        && (!('creditLimit' in d) || isMoney(d.creditLimit))
+        && (!('terms' in d) || (d.terms is string && d.terms.size() <= 200))
+        && (!('taxNumber' in d) || (d.taxNumber is string && d.taxNumber.size() <= 50));
+    }
+
+    // ===============================================================
+    // Rules (default deny: anything not listed below is refused)
+    // ===============================================================
+
+    match /businesses/{businessId} {
+      allow read: if isOwner(businessId);
+      allow create: if isOwner(businessId) && validBusiness(businessId);
+      allow update: if isOwner(businessId)
+        && validBusiness(businessId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+
+      // Append-only ledger. A re-sent record is accepted only if it is identical
+      // to the stored one, so retries after a lost connection are safe (idempotent)
+      // but a stored sale can never be altered or removed.
+      match /sales/{saleId} {
+        allow read: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validSale(saleId);
+        allow update: if isOwner(businessId) && request.resource.data == resource.data;
+        allow delete: if false;
+      }
+
+      match /payments/{paymentId} {
+        allow read: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validPayment(paymentId);
+        allow update: if isOwner(businessId) && request.resource.data == resource.data;
+        allow delete: if false;
+      }
+
+      match /customers/{customerId} {
+        allow read: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validCustomer(customerId);
+        allow update: if isOwner(businessId) && validCustomer(customerId);
+        allow delete: if false;
+      }
+    }
+  }
+}

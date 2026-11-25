@@ -47,12 +47,22 @@ const POSSynchroniser = {
             taxNumber: c.taxNumber,
           });
       }
-      const result = await GoogleBackend.sync({
+      // Signed in to the cloud account -> Firebase. Otherwise the optional Google Apps Script backend.
+      const useFirebase =
+        typeof FirebaseBackend !== "undefined" && FirebaseBackend.isSignedIn();
+      const backend = useFirebase ? FirebaseBackend : GoogleBackend;
+      const business = {
+        name: (await POSDB.get("settings", "businessName"))?.value,
+        currency: (await POSDB.get("settings", "currency"))?.value,
+        tier: (await POSDB.get("settings", "tier"))?.value,
+      };
+      const result = await backend.sync({
         type: "pos_sync",
         schemaVersion: 2,
         transactions: sales,
         payments,
         customers,
+        business,
       });
       if (!result || !Array.isArray(result.acceptedIds))
         throw new Error(

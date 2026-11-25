@@ -100,3 +100,14 @@ Mwakete sellers must use the existing Mwakete identity, customer and inventory s
 - `service-worker.js`, `manifest.webmanifest`: PWA shell
 - `google-apps-script/`: sample per-business Apps Script backend
 - `docs/`: implementation roadmap and API contracts
+- `firebase.json`, `firestore.rules`, `firestore.indexes.json`, `.firebaserc`: Firebase project config
+- `js/integrations/firebase*.js`, `js/cloud-ui.js`: optional cloud account
+
+## Cloud account (Firebase), optional
+- **Settings → Cloud account:** create an account or sign in with email and password (Firebase Authentication, project `mwakete-pos`). While signed in, pending sales, payments and trade customers sync to Cloud Firestore (Standard edition, `australia-southeast1`). Signed out, the app uses the optional Google Apps Script backend or stays local-only.
+- **Data layout:** `businesses/{ownerUid}` with `sales`, `payments` and `customers` subcollections. The sale or payment ID is the document ID, so sync is idempotent. See `firestore.rules` (owner-only, append-only ledger, default deny).
+- **Balances:** read back from Firestore (account invoices minus payments, integer cents) for the customers in each sync.
+- **SDK:** Firebase v11.10.0 loads from Google's CDN on demand, so the app still starts offline.
+- **Deploy:** `npx -y firebase-tools@latest deploy --only auth,firestore --project mwakete-pos`
+- **IDs:** Web app `1:648701661858:web:e96059c73228e578d43dfb` (used by this PWA). Android app `1:648701661858:android:a415bbcc6cb9df9cd43dfb` is registered in the same project but not used by this PWA.
+- **Not built yet:** product sync, staff roles, email verification, App Check, emulator-based rules tests. See `SECURITY.md`.
