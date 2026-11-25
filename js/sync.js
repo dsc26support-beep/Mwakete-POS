@@ -138,6 +138,7 @@ const POSSynchroniser = {
             (cloud && cloud.summary ? " " + cloud.summary : ""),
         );
       if (window.InvoiceUI) await InvoiceUI.render();
+      if (window.RefundsUI) await RefundsUI.render();
       if (typeof refresh === "function") await refresh();
     } catch (e) {
       setSyncUI("Sync needs attention", e.message);

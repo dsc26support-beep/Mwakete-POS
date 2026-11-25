@@ -105,6 +105,10 @@ const stamp = Date.now();
     await tab(p, "sale");
     await p.click("[data-add]");
     await p.click("#checkout");
+    await p.waitForTimeout(250);
+    // Retail and Wholesale open a receipt after each sale; close it so the page is usable.
+    if (await p.locator("#receiptPanel:not(.hidden)").count())
+      await p.click("#receiptClose");
   }
 
   /* ----- owner: unverified email blocks sync; verified email syncs ----- */
@@ -214,6 +218,49 @@ const stamp = Date.now();
   console.log(
     "ok: cashier sale synced into the owner's business with their uid",
   );
+
+  /* ----- credit notes reach the cloud, stamped with who recorded them ----- */
+  for (const p of [owner, cash])
+    await p.evaluate(async () => {
+      await TierCore.setTier(POSDB, "retail");
+      await TierUI.apply();
+    });
+  for (const p of [owner, cash]) {
+    await tab(p, "sales");
+    await p.click(".sale-row[data-sale-id]");
+    await p.waitForSelector("#receiptPanel:not(.hidden)");
+    await p.click("#receiptRefund");
+    await p.fill('#refundLines [data-line="0"]', "1");
+    await p.click("#refundConfirm");
+    await p.waitForSelector("#receiptPanel:not(.hidden)");
+    await p.click("#receiptClose");
+    await p.click("#syncNow");
+    await p.waitForFunction(
+      () =>
+        /Backed up/.test(document.getElementById("refundsList").textContent),
+      null,
+      { timeout: 30000 },
+    );
+  }
+  const refundDocs =
+    (await rest("businesses/" + ownerUid + "/refunds")).documents || [];
+  assert.equal(
+    refundDocs.length,
+    2,
+    "both credit notes are in the owner's business",
+  );
+  assert.ok(
+    refundDocs.some((d) => d.fields.staffUid.stringValue === cashUid),
+    "the cashier's credit note carries their uid",
+  );
+  assert.ok(
+    refundDocs.every(
+      (d) =>
+        d.fields.method.stringValue === "cash" &&
+        Number(d.fields.total.doubleValue ?? d.fields.total.integerValue) === 3,
+    ),
+  );
+  console.log("ok: credit notes synced from owner and cashier");
 
   /* ----- owner removes the cashier's access ----- */
   await tab(owner, "setup");
