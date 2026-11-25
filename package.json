@@ -4,6 +4,6 @@
   "description": "Mwakete POS — static PWA, no build step. package.json exists only to run tests.",
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
-    "test:e2e": "node tests/e2e/tiers.e2e.js && node tests/e2e/wholesale.e2e.js && node tests/e2e/invoices.e2e.js && node tests/e2e/refunds.e2e.js && node tests/e2e/register.e2e.js && node tests/e2e/stock.e2e.js && node tests/e2e/trade.e2e.js && node tests/e2e/csv.e2e.js && node tests/e2e/resilience.e2e.js && node tests/e2e/backup.e2e.js && node tests/e2e/checkout.e2e.js"
+    "test:e2e": "node tests/e2e/tiers.e2e.js && node tests/e2e/wholesale.e2e.js && node tests/e2e/invoices.e2e.js && node tests/e2e/refunds.e2e.js && node tests/e2e/register.e2e.js && node tests/e2e/stock.e2e.js && node tests/e2e/trade.e2e.js && node tests/e2e/csv.e2e.js && node tests/e2e/resilience.e2e.js && node tests/e2e/backup.e2e.js && node tests/e2e/checkout.e2e.js && node tests/e2e/catalogue.e2e.js"
   }
 }

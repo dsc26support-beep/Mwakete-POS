@@ -85,6 +85,8 @@ const CloudUI = (() => {
     document
       .querySelectorAll("[data-owner-only]")
       .forEach((el) => el.classList.toggle("role-hidden", cashier));
+    // Lets dynamically drawn owner-only buttons (product edit / archive / remove) hide too.
+    document.body.classList.toggle("role-cashier", cashier);
     renderStaff();
   }
 

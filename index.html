@@ -111,6 +111,19 @@
           <label data-feature="tax" class="check hidden"><input type="checkbox" name="taxExempt"> Tax exempt (no tax on this product when invoices are added)</label>
           <button class="button primary" type="submit">Add product</button>
         </form>
+        <div class="filter-row" role="search">
+          <input id="prodFilterText" type="search" placeholder="Search name, barcode or description" aria-label="Search products">
+          <select id="prodFilterCat" aria-label="Filter by category"><option value="">All categories</option></select>
+          <select id="prodFilterAvail" aria-label="Filter by availability"><option value="">Active products</option><option value="out">Out of stock</option><option value="low">Low stock</option><option value="available">Available</option><option value="archived">Archived</option></select>
+        </div>
+        <p id="stockAlerts" class="hint" role="status"></p>
+        <p id="stockValue" class="hint"></p>
+        <div class="bulk-bar" data-owner-only>
+          <label class="check"><input id="prodSelectAll" type="checkbox"> Select all shown</label>
+          <select id="bulkType" aria-label="Bulk change"><option value="percent">Change price by %</option><option value="category">Set category</option><option value="unit">Set unit</option><option value="archive">Archive</option><option value="restore">Restore</option></select>
+          <input id="bulkValue" maxlength="40" placeholder="Value" aria-label="Bulk change value">
+          <button id="bulkApply" class="button secondary" type="button">Apply to selected</button>
+        </div>
         <div id="productTable" class="table-wrap"></div>
         <details id="csvPanel" class="csv-box" data-owner-only>
           <summary>Import or export products (CSV file)</summary>
@@ -448,6 +461,26 @@
       </form>
     </div>
   </div>
+  <div id="productEditPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="productEditTitle">
+    <div class="modal-card">
+      <h3 id="productEditTitle">Edit product</h3>
+      <form id="productEditForm" class="settings-form">
+        <label>Name<input name="name" required maxlength="100"></label>
+        <label>Price<input name="price" type="number" min="0" step="0.01" required></label>
+        <label>Cost price (stays on this device)<input name="costPrice" type="number" min="0" step="0.01" placeholder="Optional"></label>
+        <label>Barcode / SKU<input name="sku" maxlength="80"></label>
+        <label>Category<input name="category" maxlength="40" list="categoryList"></label>
+        <label>Reorder level<input name="reorderLevel" type="number" min="0" step="1" placeholder="Optional"></label>
+        <label>Unit<select name="unit"></select></label>
+        <label>Description<textarea name="description" maxlength="300" rows="2"></textarea></label>
+        <label>Picture (stays on this device)<input name="imageFile" type="file" accept="image/*"></label>
+        <label class="check"><input type="checkbox" name="clearImage"> Remove the picture</label>
+        <label class="check"><input type="checkbox" name="archived"> Archived (hidden from the till, kept in reports)</label>
+        <p id="productHistory" class="hist"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="productEditCancel">Cancel</button><button class="button primary" type="submit">Save</button></div>
+      </form>
+    </div>
+  </div>
   <div id="heldPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="heldTitle">
     <div class="modal-card">
       <h3 id="heldTitle">Held sales</h3>
@@ -469,6 +502,7 @@
   <script src="./js/integrations/firebase.js"></script>
   <script src="./js/cloud-ui.js"></script>
   <script src="./js/checkout.js"></script>
+  <script src="./js/catalogue.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -485,6 +519,7 @@
   <script src="./js/wholesale-ui.js"></script>
   <script src="./js/invoices-ui.js"></script>
   <script src="./js/checkout-ui.js"></script>
+  <script src="./js/catalogue-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>

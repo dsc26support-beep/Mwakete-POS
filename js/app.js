@@ -33,10 +33,23 @@ async function refresh() {
 const MAX_GRID = 150, // product cards drawn at the till
   MAX_ROWS = 200, // rows drawn in the product list
   MAX_SALES = 100; // sales drawn in the history
+const MAX_QTY = 9999; // most of one item in a single sale
+// Stock counts live on each device and can be out of date, so this warns and never blocks a sale.
+function stockWarn(p, line) {
+  if (!p || !line) return;
+  const need = line.qty * (line.packUnits || 1);
+  if (Number.isFinite(Number(p.stock)) && need > Number(p.stock))
+    toast("Only " + p.stock + " of " + p.name + " in stock on this device.");
+}
 function renderProducts() {
   const q = $("productSearch").value.toLowerCase().trim(),
-    items = products.filter((p) =>
-      (p.name + " " + (p.sku || "")).toLowerCase().includes(q),
+    // Archived products are hidden from the till (they stay in the list and in old sales).
+    items = products.filter(
+      (p) =>
+        !p.archived &&
+        (p.name + " " + (p.sku || "") + " " + (p.description || ""))
+          .toLowerCase()
+          .includes(q),
     );
   // A long product list is drawn in part (the search still looks through ALL of them), so a low-cost phone stays quick.
   const shown = items.slice(0, MAX_GRID);
@@ -44,7 +57,7 @@ function renderProducts() {
     shown
       .map(
         (p) =>
-          `<button class="product-card" data-add="${p.id}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock} in stock</small></button>`,
+          `<button class="product-card" data-add="${p.id}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock > 0 ? p.stock + " in stock" : '<span class="badge out">Out of stock</span>'}</small></button>`,
       )
       .join("") +
     (items.length > shown.length
@@ -119,6 +132,7 @@ async function restoreDraft() {
   toast("Your unfinished sale was restored.");
 }
 function renderProductTable() {
+  if (window.CatalogueUI) return CatalogueUI.render(products);
   $("productTable").innerHTML = products.length
     ? `<table><thead><tr><th>Product</th><th>SKU / barcode</th><th>Price</th><th>Stock</th><th></th></tr></thead><tbody>${products
         .slice(0, MAX_ROWS)
@@ -171,9 +185,16 @@ document.addEventListener("click", async (e) => {
     const p = products.find((x) => x.id === add.dataset.add);
     if (p) {
       const line = cart.find((x) => x.id === p.id);
-      if (line) line.qty++;
-      else
+      if (line) {
+        if (line.qty >= MAX_QTY)
+          toast("Maximum " + MAX_QTY + " of one item per sale.");
+        else line.qty++;
+      } else
         cart.push(window.WholesaleUI ? WholesaleUI.line(p) : { ...p, qty: 1 });
+      stockWarn(
+        p,
+        cart.find((x) => x.id === p.id),
+      );
       renderCart();
     }
     return;
@@ -181,7 +202,15 @@ document.addEventListener("click", async (e) => {
   const inc = e.target.closest("[data-inc]");
   if (inc) {
     const x = cart.find((x) => x.id === inc.dataset.inc);
-    if (x) x.qty++;
+    if (x && x.qty >= MAX_QTY)
+      toast("Maximum " + MAX_QTY + " of one item per sale.");
+    else if (x) {
+      x.qty++;
+      stockWarn(
+        products.find((p) => p.id === (x.productId || x.id)),
+        x,
+      );
+    }
     renderCart();
     return;
   }
@@ -363,6 +392,7 @@ window.addEventListener("offline", connection);
     },
     render: renderCart,
   });
+  await CatalogueUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

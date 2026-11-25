@@ -108,6 +108,15 @@ const FirebaseBackend = (() => {
       prices: p.prices && typeof p.prices === "object" ? p.prices : undefined,
       packs: Array.isArray(p.packs) ? p.packs : undefined,
       taxExempt: typeof p.taxExempt === "boolean" ? p.taxExempt : undefined,
+      // costPrice and image stay on the device on purpose: cashiers can read the catalogue and must not see margins.
+      description: p.description
+        ? String(p.description).slice(0, 300)
+        : undefined,
+      unit: p.unit ? String(p.unit).slice(0, 12) : undefined,
+      archived: p.archived === true ? true : undefined,
+      priceHistory: Array.isArray(p.priceHistory)
+        ? p.priceHistory.slice(-20)
+        : undefined,
       updatedAt: Number(p.updatedAt) || Date.now(),
     };
     return toRecord(out);
@@ -121,6 +130,10 @@ const FirebaseBackend = (() => {
     "prices",
     "packs",
     "taxExempt",
+    "description",
+    "unit",
+    "archived",
+    "priceHistory",
   ];
   // Decide what to change on this device after pulling the cloud catalogue.
   //  - new in the cloud -> add locally (stock is seeded from the cloud once)

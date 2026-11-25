@@ -249,6 +249,30 @@ const server = http.createServer((req, res) => {
   await page.waitForSelector("#refundPanel:not(.hidden)");
   await scan("refund dialog");
   await page.keyboard.press("Escape");
+  await page.evaluate(() =>
+    document.getElementById("receiptPanel").classList.add("hidden"),
+  );
+  await page.click('.tab[data-view="sale"]');
+  await page.click("#resumeSale");
+  await page.waitForSelector("#heldPanel:not(.hidden)");
+  await scan("held sales dialog");
+  await page.click("#heldClose");
+  await page.click('.tab[data-view="products"]');
+  await page.evaluate(async () => {
+    await POSDB.put("products", {
+      id: "a11y1",
+      name: "Scan item",
+      price: 2,
+      stock: 0,
+      updatedAt: 1,
+    });
+    await refresh();
+  });
+  await page.click('[data-edit="a11y1"]');
+  await page.waitForSelector("#productEditPanel:not(.hidden)");
+  await scan("product edit dialog");
+  await page.click("#productEditCancel");
+  await scan("product list with alerts and bulk bar");
   await page.click('.tab[data-view="setup"]');
   await scan("signed-out cloud account panel");
 

@@ -18,7 +18,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-008 | Hold or suspend a sale | Verified | hold/resume stored on the device, survives reload (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
 | POS-009 | Resume held sales | Verified | hold/resume stored on the device, survives reload (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
 | POS-010 | Clear cart | Verified | e2e |
-| POS-011 | Prevent invalid quantities | Partial | +/− only; no upper bound or stock check |
+| POS-011 | Prevent invalid quantities | Verified | quantity capped at 9999 per line (e2e catalogue) |
 | POS-012 | Handle checkout validation | Partial | invoice/credit-limit/payment-method checks exist |
 | POS-013 | Display checkout totals clearly | Verified | e2e |
 | POS-014 | Checkout without customer account | Verified | e2e |
@@ -47,22 +47,22 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
 | POS-031 | Create products | Verified | e2e |
-| POS-032 | Edit products | Missing | list has Remove only |
-| POS-033 | Delete or archive products | Partial | delete only, no archive |
+| POS-032 | Edit products | Verified | edit dialog (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-033 | Delete or archive products | Verified | archive/restore keeps history; delete still available (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-034 | Product name | Verified | |
-| POS-035 | Product description | Missing | |
+| POS-035 | Product description | Verified | description, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-036 | Product SKU | Verified | one field serves SKU and barcode |
 | POS-037 | Product barcode | Partial | same field as SKU, no separate barcode |
 | POS-038 | Product category | Verified | Retail+ |
-| POS-039 | Product image | Missing | |
-| POS-040 | Product cost price | Missing | |
+| POS-039 | Product image | Verified | small picture, stored on this device only (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-040 | Product cost price | Verified | cost price, stored on this device only so cashiers cannot see margins (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-041 | Product retail price | Verified | |
 | POS-042 | Product wholesale price | Partial | via price lists |
 | POS-043 | Product quantity | Verified | |
-| POS-044 | Unit of measurement | Missing | |
-| POS-045 | Availability status | Missing | |
+| POS-044 | Unit of measurement | Verified | unit list, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-045 | Availability status | Verified | available / low / out / archived status (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-046 | Product import | Verified | CSV (unit + e2e) |
-| POS-047 | Bulk product editing | Missing | |
+| POS-047 | Bulk product editing | Verified | bulk price %, category, unit, archive, restore (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-048 | Product export | Verified | CSV (unit + e2e) |
 
 ## D. Inventory management
@@ -77,15 +77,15 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-055 | Stock count | Verified | "count" action |
 | POS-056 | Stock reconciliation | Partial | single-product count only, no full stock-take or variance report |
 | POS-057 | Low-stock alerts | Partial | Retail low-stock list |
-| POS-058 | Out-of-stock alerts | Missing | |
-| POS-059 | Stock valuation | Missing | needs cost price |
-| POS-060 | Inventory search | Partial | product search only |
-| POS-061 | Inventory category filtering | Missing | |
+| POS-058 | Out-of-stock alerts | Verified | out-of-stock alert line and badges (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-059 | Stock valuation | Verified | valuation at selling price and at cost; products without cost are called out (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-060 | Inventory search | Verified | search by name, barcode, description (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-061 | Inventory category filtering | Verified | category filter (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-062 | Inventory export | Verified | CSV export includes stock |
 | POS-063 | Stock receiving | Verified | purchase orders |
 | POS-064 | Inventory audit trail | Partial | movements without device/user on local records |
 | POS-065 | Inventory transaction integrity | Partial | |
-| POS-066 | Stock availability validation | Missing | |
+| POS-066 | Stock availability validation | Partial | warns when a sale goes past this device's stock count; never blocks because counts can be stale |
 
 ## E. Retail and wholesale pricing
 | ID | Capability | Status | Evidence / gap |
@@ -101,7 +101,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-075 | Discount authorization rules | Missing | |
 | POS-076 | Minimum wholesale quantity | Missing | |
 | POS-077 | Pricing validation | Partial | |
-| POS-078 | Price change history | Missing | |
+| POS-078 | Price change history | Verified | last 20 price changes per product, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-079 | Price rounding rules | Partial | exact cents; no cash rounding option |
 | POS-080 | Prevent unauthorized price overrides | Partial | no price editing at the till; rules cannot verify prices |
 

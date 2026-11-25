@@ -177,6 +177,28 @@ test("productToCloud keeps only whitelisted fields and drops empty values", () =
   ]);
 });
 
+test("productToCloud syncs description/unit/archived/history but never cost price or image", () => {
+  const c = productToCloud({
+    ...prod("p1"),
+    description: "Loose leaf",
+    unit: "kg",
+    archived: true,
+    priceHistory: [{ at: 1, from: 1, to: 2 }],
+    costPrice: 4,
+    image: "data:image/png;base64,AAAA",
+  });
+  assert.equal(c.description, "Loose leaf");
+  assert.equal(c.unit, "kg");
+  assert.equal(c.archived, true);
+  assert.equal(c.priceHistory.length, 1);
+  assert.equal("costPrice" in c, false);
+  assert.equal("image" in c, false);
+  assert.equal(
+    "archived" in productToCloud({ ...prod("p2"), archived: false }),
+    false,
+  );
+});
+
 test("isDirty: edited after the last cloud confirmation", () => {
   assert.equal(isDirty({ updatedAt: 10 }), true);
   assert.equal(isDirty({ updatedAt: 10, cloudSyncedAt: 10 }), false);

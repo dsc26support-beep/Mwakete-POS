@@ -190,6 +190,28 @@ test("email verification: an unverified cashier is refused even with an active s
   await assertFails(getDocs(collection(u, "businesses", OWNER, "products")));
 });
 
+test("products: description, unit, archived and price history are accepted; bad shapes and cost price are refused", async () => {
+  const w = (id, extra) =>
+    setDoc(ref(db(OWNER), "businesses", OWNER, "products", id), {
+      ...product(id),
+      ...extra,
+    });
+  await assertSucceeds(
+    w("c1", {
+      description: "Loose leaf",
+      unit: "kg",
+      archived: true,
+      priceHistory: [{ at: 1, from: 1, to: 2 }],
+    }),
+  );
+  await assertFails(w("c2", { description: "x".repeat(301) }));
+  await assertFails(w("c3", { archived: "yes" }));
+  await assertFails(w("c4", { priceHistory: "none" }));
+  // cost price never leaves the device, so the cloud schema refuses it
+  await assertFails(w("c5", { costPrice: 3 }));
+  await assertFails(w("c6", { image: "data:image/png;base64,AAAA" }));
+});
+
 /* ---------- sales (owner) ---------- */
 test("sales: owner can create a plain sale and the real wholesale invoice shape", async () => {
   await assertSucceeds(
