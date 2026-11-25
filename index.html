@@ -290,6 +290,27 @@
           <button class="button primary" type="submit">Save tax settings</button>
         </form>
       </div>
+      <div class="panel" id="backupPanel">
+        <p class="eyebrow">YOUR DATA</p><h2>Backup and support</h2>
+        <div data-owner-only>
+          <p class="hint">Customers, price lists and settings live <strong>only on this device</strong>. Download a backup file now and then, and keep it somewhere safe (for example your email or a USB stick). Restoring puts those records back; it never deletes anything, and a record with the same ID is replaced.</p>
+          <div class="row-actions">
+            <button class="button secondary" type="button" id="backupDownload">Download a backup file</button>
+            <label class="button secondary">Restore from a backup file<input type="file" id="backupFile" accept=".json,application/json" hidden></label>
+          </div>
+          <p id="backupLast" class="muted"></p>
+          <div id="backupPreview" aria-live="polite"></div>
+        </div>
+        <details id="diagBox">
+          <summary>Diagnostics for support</summary>
+          <p class="hint">If something is not working, copy this and send it to support. It has version numbers, counts and error messages only: no sales, product or customer names, amounts or email addresses. Nothing is sent unless you send it.</p>
+          <div class="row-actions">
+            <button class="button secondary" type="button" id="diagCopy">Copy</button>
+            <a class="button secondary" id="diagMail" href="#">Email support</a>
+          </div>
+          <pre id="diagText" tabindex="0" aria-label="Diagnostics for support"></pre>
+        </details>
+      </div>
       <div class="panel setup-panel">
         <p class="eyebrow">GET STARTED</p><h2>Set up your business</h2>
         <p class="muted">Your business name and currency are stored locally on this device. Connect a Google backend when the secure provisioning service is configured.</p>
@@ -420,6 +441,8 @@
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
+  <script src="./js/backup.js"></script>
+  <script src="./js/diagnostics.js"></script>
   <script src="./js/csv.js"></script>
   <script src="./js/stock.js"></script>
   <script src="./js/trade.js"></script>
@@ -433,6 +456,7 @@
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>
+  <script src="./js/backup-ui.js"></script>
   <script src="./js/cloudreport-ui.js"></script>
   <script src="./js/stock-ui.js"></script>
   <script src="./js/quotes-ui.js"></script>
@@ -441,6 +465,7 @@
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
   <script src="./js/help.js"></script>
+  <script src="./js/a11y.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>

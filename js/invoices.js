@@ -351,7 +351,7 @@ const InvoiceCore = (() => {
   function invoiceRow(s) {
     const inv = s.invoice;
     const bad = s.syncStatus === "rejected";
-    return `<div class="resource-row sale-row" data-sale-id="${esc(s.id)}"><div><strong>${esc(inv.number)}</strong><small>${esc(fmtDate(s.createdAt))} · ${esc(inv.customerName)} · ${inv.mode === "account" ? "on account" : "paid"} · ${esc(s.syncStatus || "pending")}${bad && s.syncError ? " — " + esc(s.syncError) : ""}</small></div><strong>${money(inv.total)}</strong></div>`;
+    return `<div class="resource-row sale-row" data-sale-id="${esc(s.id)}" tabindex="0" role="button"><div><strong>${esc(inv.number)}</strong><small>${esc(fmtDate(s.createdAt))} · ${esc(inv.customerName)} · ${inv.mode === "account" ? "on account" : "paid"} · ${esc(s.syncStatus || "pending")}${bad && s.syncError ? " — " + esc(s.syncError) : ""}</small></div><strong>${money(inv.total)}</strong></div>`;
   }
   function paymentRow(p) {
     const bad = p.syncStatus === "rejected";

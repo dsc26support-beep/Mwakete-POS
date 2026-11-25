@@ -30,17 +30,26 @@ async function refresh() {
   if (window.QuotesUI) await QuotesUI.render();
   if (window.PurchasingUI) await PurchasingUI.render();
 }
+const MAX_GRID = 150, // product cards drawn at the till
+  MAX_ROWS = 200, // rows drawn in the product list
+  MAX_SALES = 100; // sales drawn in the history
 function renderProducts() {
   const q = $("productSearch").value.toLowerCase().trim(),
     items = products.filter((p) =>
       (p.name + " " + (p.sku || "")).toLowerCase().includes(q),
     );
-  $("productGrid").innerHTML = items
-    .map(
-      (p) =>
-        `<button class="product-card" data-add="${p.id}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock} in stock</small></button>`,
-    )
-    .join("");
+  // A long product list is drawn in part (the search still looks through ALL of them), so a low-cost phone stays quick.
+  const shown = items.slice(0, MAX_GRID);
+  $("productGrid").innerHTML =
+    shown
+      .map(
+        (p) =>
+          `<button class="product-card" data-add="${p.id}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock} in stock</small></button>`,
+      )
+      .join("") +
+    (items.length > shown.length
+      ? `<p class="hint" style="grid-column:1/-1">Showing ${shown.length} of ${items.length}. Type in the search box to find the rest.</p>`
+      : "");
   $("emptyProducts").classList.toggle("hidden", products.length > 0);
   if (window.WholesaleUI) WholesaleUI.afterProducts();
 }
@@ -65,10 +74,60 @@ function renderCart() {
       : $("paymentMethod").value === "account"
         ? "Create invoice (on account)"
         : "Record payment (unverified)";
+  saveDraft();
+}
+/* Crash recovery: the unfinished sale in the cart is kept on the device, so a dead battery or a closed tab does not lose it.
+ * It is cleared by the same code path that empties the cart (a completed sale or "Clear"). */
+let draftTimer;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const value = cart.map((x) => ({
+      id: x.id,
+      productId: x.productId || x.id,
+      name: x.name,
+      sku: x.sku,
+      price: x.price,
+      qty: x.qty,
+      listId: x.listId || "",
+      ...(x.packId ? { packId: x.packId, packUnits: x.packUnits } : {}),
+      ...(x.taxExempt ? { taxExempt: true } : {}),
+    }));
+    Promise.resolve(POSDB.put("settings", { key: "cartDraft", value })).catch(
+      () => {},
+    );
+  }, 50);
+}
+async function restoreDraft() {
+  const d = (await POSDB.get("settings", "cartDraft"))?.value;
+  if (!Array.isArray(d) || !d.length || cart.length) return;
+  const prods = await POSDB.all("products");
+  const byId = new Map(prods.map((p) => [p.id, p]));
+  const keep = d.filter(
+    (l) =>
+      l &&
+      byId.has(l.productId) &&
+      Number.isInteger(l.qty) &&
+      l.qty > 0 &&
+      Number.isFinite(l.price) &&
+      l.price >= 0,
+  );
+  if (!keep.length) return;
+  cart = keep.map((l) => ({ ...byId.get(l.productId), ...l })); // current stock and tax flag, the line's own price and quantity
+  renderCart();
+  toast("Your unfinished sale was restored.");
 }
 function renderProductTable() {
   $("productTable").innerHTML = products.length
-    ? `<table><thead><tr><th>Product</th><th>SKU / barcode</th><th>Price</th><th>Stock</th><th></th></tr></thead><tbody>${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.sku || "—")}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="text-button" data-delete="${p.id}">Remove</button></td></tr>`).join("")}</tbody></table>`
+    ? `<table><thead><tr><th>Product</th><th>SKU / barcode</th><th>Price</th><th>Stock</th><th></th></tr></thead><tbody>${products
+        .slice(0, MAX_ROWS)
+        .map(
+          (p) =>
+            `<tr><td>${esc(p.name)}</td><td>${esc(p.sku || "—")}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="text-button" data-delete="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></td></tr>`,
+        )
+        .join(
+          "",
+        )}</tbody></table>${products.length > MAX_ROWS ? `<p class="hint">Showing the first ${MAX_ROWS} of ${products.length} products. Use <strong>Export products</strong> below to see them all.</p>` : ""}`
     : '<p class="empty">No products added yet.</p>';
 }
 async function renderSales() {
@@ -85,11 +144,15 @@ async function renderSales() {
   };
   $("salesList").innerHTML = sales.length
     ? sales
+        .slice(0, MAX_SALES)
         .map(
           (s) =>
-            `<div class="sale-row" data-sale-id="${esc(s.id)}"><div><strong>${esc(s.id.slice(0, 18))}</strong><small>${new Date(s.createdAt).toLocaleString()} · ${s.paymentMethod} · ${s.syncStatus}${refundedText(s)}</small></div><strong>${money(s.total)}</strong></div>`,
+            `<div class="sale-row" data-sale-id="${esc(s.id)}" tabindex="0" role="button"><div><strong>${esc(s.id.slice(0, 18))}</strong><small>${new Date(s.createdAt).toLocaleString()} · ${s.paymentMethod} · ${s.syncStatus}${refundedText(s)}</small></div><strong>${money(s.total)}</strong></div>`,
         )
-        .join("")
+        .join("") +
+      (sales.length > MAX_SALES
+        ? `<p class="hint">Showing the newest ${MAX_SALES} of ${sales.length} sales. Older sales are still saved.</p>`
+        : "")
     : '<p class="empty">No sales recorded yet.</p>';
 }
 function esc(s) {
@@ -293,11 +356,13 @@ window.addEventListener("offline", connection);
   await RegisterUI.init();
   await StockUI.init();
   await CsvUI.init();
+  await BackupUI.init();
   await CloudReportUI.init();
   await QuotesUI.init();
   await PurchasingUI.init();
   await HelpCentre.init();
   await CloudUI.init();
+  await restoreDraft();
   connection();
   if ("serviceWorker" in navigator)
     navigator.serviceWorker

@@ -2,6 +2,35 @@
  * The server answers per record: accepted ids, or rejected {id, reason}. A rejected record is kept and flagged
  * (never silently dropped, never retried blindly). Records the server did not mention stay pending.
  */
+/* After a failed sync, try again by itself: 30 s, 1 min, 2 min, 4 min ... never slower than every 15 min, each wait varied by
+ * +/-25% so many devices coming back online together do not all hit the server at once. A successful sync resets it.
+ * While the device is offline nothing is attempted; the "online" event starts a sync as soon as the connection is back. */
+const SyncBackoff = {
+  failures: 0,
+  timer: null,
+  delay(failures, rand = Math.random) {
+    const base = Math.min(15 * 60000, 30000 * 2 ** Math.max(0, failures - 1));
+    return Math.round(base * (0.75 + rand() * 0.5));
+  },
+  failed(retry, schedule = setTimeout, rand = Math.random) {
+    this.failures++;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = schedule(
+      () => {
+        this.timer = null;
+        if (typeof navigator === "undefined" || navigator.onLine !== false)
+          retry();
+      },
+      this.delay(this.failures, rand),
+    );
+    return this.timer;
+  },
+  reset() {
+    this.failures = 0;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  },
+};
 const POSSynchroniser = {
   running: false,
   async run() {
@@ -72,6 +101,13 @@ const POSSynchroniser = {
         currency: (await POSDB.get("settings", "currency"))?.value,
         tier: (await POSDB.get("settings", "tier"))?.value,
       };
+      const waiting =
+        sales.length +
+        payments.length +
+        products.length +
+        productDeletes.length +
+        Object.values(extra).reduce((n, a) => n + a.length, 0);
+      if (waiting) setSyncUI("Syncing…", waiting + " record(s) being sent.");
       const result = await backend.sync({
         type: "pos_sync",
         schemaVersion: 2,
@@ -83,6 +119,13 @@ const POSSynchroniser = {
           ? { products, productDeletes: productDeletes.map((t) => t.id), extra }
           : {}),
       });
+      if (result && result.configured === false)
+        throw Object.assign(
+          new Error(
+            "No cloud account or Google backend is set up, so sales stay on this device.",
+          ),
+          { noBackoff: true },
+        );
       if (!result || !Array.isArray(result.acceptedIds))
         throw new Error(
           (result && result.error) ||
@@ -137,11 +180,20 @@ const POSSynchroniser = {
             " record(s) synchronised." +
             (cloud && cloud.summary ? " " + cloud.summary : ""),
         );
+      SyncBackoff.reset();
       if (window.InvoiceUI) await InvoiceUI.render();
       if (window.RefundsUI) await RefundsUI.render();
       if (typeof refresh === "function") await refresh();
     } catch (e) {
-      setSyncUI("Sync needs attention", e.message);
+      // An error the person has to fix first (no backend, unverified email) is not retried on a timer.
+      if (e.noBackoff) setSyncUI("Sync needs attention", e.message);
+      else {
+        setSyncUI(
+          "Sync needs attention",
+          e.message + " Trying again automatically.",
+        );
+        SyncBackoff.failed(() => POSSynchroniser.run().catch(() => {}));
+      }
       throw e;
     } finally {
       this.running = false;

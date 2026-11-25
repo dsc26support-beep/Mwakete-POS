@@ -51,4 +51,32 @@ Before production:
 - **Test-only emulator switch:** the app connects to local emulators only when the page is served from `localhost` with `?emulator=1`. It cannot be triggered on the real site.
 - **Known limits (production blockers):** rules cannot verify that a sale's total equals its line items, so the owner's own app (and a cashier's app) is trusted for prices and totals; the business and staff codes are guessable only by someone who knows the account ID; a cashier's device keeps its local data after access is removed (sign out and clear site data on a lost device); the rules are tested against the Firestore emulator (`tests/rules`, 25 tests) and the owner/cashier flows against the Auth and Firestore emulators, but only with the cases written there, and have had no independent security review; no App Check; no per-device revocation; no rate limiting beyond Firebase's defaults.
 
+## Controls added with the full feature set
+- **Credit notes (refunds):** append-only, stamped with who recorded them. The cloud rules require the original sale to exist, the credit note to be no larger than that sale, and a credit to a customer's account to match an invoice on account for the same customer. The rules **cannot add up several credit notes** against one sale; the app does that sum exactly (integer cents, the last refund returns exactly what is left) and the owner can audit the list.
+- **Register shifts:** a closed shift is append-only. The expected-cash arithmetic runs on the device that sold, so a person with the device can change the numbers before they sync; the shift report is an aid for honest counting, not proof against theft.
+- **Stock movements:** append-only audit trail with a reason. Stock itself is **per device**: nothing stops two devices from selling the same last item, and a sale or refund changes stock without writing a movement.
+- **Suppliers and purchase orders:** owner only. An order can be edited until it is received or cancelled, never rolled back to an older version (`updatedAt` must not go backwards), and receiving writes one movement per line.
+- **Quotes:** a member edits only their own quote while it is open; the owner can edit any open one. A quote becomes an invoice once: "Make invoice" loads the till, and the quote is marked converted only after the sale is saved and only if the sale contains the quoted goods for the quoted customer.
+- **CSV import:** a preview first, nothing saved until confirmed; 2 MB and 5,000-row limits; every row validated; duplicates by barcode then name; stock counts kept unless chosen. **Export** neutralises spreadsheet formulas (a leading `= + - @` gets an apostrophe).
+- **Backup and restore:** a backup file is **plain text** with the business's customers (names, phones), prices and sales. Keep it private; it is not encrypted. Restore validates every record, ignores unknown record kinds, skips and lists bad records, replaces records with the same ID and deletes nothing, and **never restores** the device code, document counters, cloud sign-in link, unfinished cart, open register or error log (so restoring onto a second device cannot cause duplicate invoice numbers).
+- **Diagnostics:** an error log of the app's own messages (30 newest) is kept on the device. The support summary contains versions, counts and error text only. Nothing is sent unless the person copies or emails it.
+- **Unfinished sale:** the cart is saved in IndexedDB so a crash does not lose it. It is not encrypted (like everything else on the device).
+- **Retry:** a failed sync retries on its own with backoff (30 s up to 15 min, +/-25%). Errors the person must fix (no backend, unverified email) are not retried on a timer.
+- **Rules audit:** the Firestore rules were audited against a red-team checklist. Fixed: unchecked invoice/discount/tax/tier types on a sale, an invoice total that could differ from its sale, a non-cash payment marked verified, back- or forward-dated records (limit: 7 days ahead of the server clock), and an unbounded staff ID length.
+- **Accessibility:** every screen in every business type, plus the dialogs, passes an automated WCAG 2.0/2.1 A and AA scan (axe), including colour contrast; dialogs trap and restore keyboard focus; clickable rows work with Tab, Enter and Space. Manual testing with a screen reader is still to do.
+
+## Production blockers (the honest list)
+Do not rely on this app for real money without supervision until these are closed:
+1. **The server does not check totals.** Firestore rules cannot recompute a sale from its lines. Doing so needs Cloud Functions, which needs Firebase's paid plan; this project deliberately does not use it. A tampered device or a hostile cashier can store a wrong total or price.
+2. **No independent security review** of the rules, the app or the emulator-based tests.
+3. **No tax-law review** of invoice wording and rounding (12.5% on the discounted taxable amount, rounded half up once per invoice, per-product exemption).
+4. **No real-device pilot.** Not tested on real low-cost Android phones, barcode scanners or thermal printers. Camera barcode scanning and thermal printer drivers are not built (receipts use the browser's print).
+5. **No App Check** (needs a reCAPTCHA key from the Firebase console) and the web API key is **not yet restricted to the app's domains** (Google Cloud Console).
+6. **Stock is not shared between devices.**
+7. **Digital payments are not verified.** A recorded card or mobile payment is only a record.
+8. **No Mwakete Marketplace integration.** The existing API contract was not available.
+9. **Local data is not encrypted at rest.** A lost or stolen device exposes what is stored on it. Use a device lock; sign out and clear site data on a lost device (an owner can also remove a cashier's access in the cloud).
+10. **Manual accessibility testing** with a screen reader, large text and the keyboard alone is still to do.
+11. **A throwaway test account** created during live testing remains in the Firebase project and should be deleted.
+
 Report vulnerabilities privately to the repository owner. Do not publish exploit details before a fix is available.

@@ -588,8 +588,11 @@ const FirebaseBackend = (() => {
       if (!user) return { configured: false };
       need();
       if (!user.emailVerified)
-        throw new Error(
-          "Verify your email to sync. Open Business setup → Cloud account.",
+        throw Object.assign(
+          new Error(
+            "Verify your email to sync. Open Business setup → Cloud account.",
+          ),
+          { noBackoff: true },
         );
       const r = role();
       if (r === "owner") await ensureBusiness(payload.business || {});

@@ -65,7 +65,7 @@ const RegisterUI = (() => {
       ? shifts
           .map(
             (s) =>
-              `<div class="sale-row" data-shift-id="${esc(s.id)}" tabindex="0" role="button" aria-label="Open shift report from ${esc(new Date(s.closedAt).toLocaleString())}"><div><strong>${esc(new Date(s.closedAt).toLocaleString())}</strong><small>${esc(G.differenceText(s.difference))} · ${s.syncStatus === "synced" ? "Backed up" : s.syncStatus === "rejected" ? "Refused by the cloud" : "Not yet backed up"}</small></div><strong>${fmt(s.countedCash)}</strong></div>`,
+              `<div class="sale-row" data-shift-id="${esc(s.id)}" tabindex="0" role="button"><div><strong>${esc(new Date(s.closedAt).toLocaleString())}</strong><small>${esc(G.differenceText(s.difference))} · ${s.syncStatus === "synced" ? "Backed up" : s.syncStatus === "rejected" ? "Refused by the cloud" : "Not yet backed up"}</small></div><strong>${fmt(s.countedCash)}</strong></div>`,
           )
           .join("")
       : '<p class="empty">No closed shifts yet.</p>';

@@ -1,5 +1,17 @@
 # Implementation roadmap
 
+## Status (25 November 2026)
+| Gate | Done | Left |
+| --- | --- | --- |
+| 1 Identity, tenancy, data ownership | Firebase email/password sign-in with verified email; one business per owner; owner and cashier roles; staff stamping on every record; rules tested against the emulator (41 tests) and audited | Mwakete Marketplace identity bridge (API contract not available); Google Drive per-business provisioning (superseded by Firebase); App Check |
+| 2 Core POS | Cashier roles, register open/close, discounts, refunds and credit notes, receipts, delivery notes, statements | Server-authoritative pricing and stock (needs Cloud Functions: not used); camera barcode scanning; thermal printer drivers |
+| 3 Offline reliability | Durable local queue, automatic retry with backoff, pending / syncing / synced / refused states, unfinished sale survives a crash, nothing unconfirmed is ever discarded | Conflict handling between devices beyond "newest edit wins" for products |
+| 4 Inventory and reporting | Stock movement audit trail, suppliers and purchase orders, owner whole-business report across all tills | Stock shared between devices; Mwakete marketplace inventory adapter; multi-outlet transfers |
+| 5 Connection Hub | CSV product import and export with preview and duplicate detection | Customer import; third-party POS APIs and webhooks |
+| 6 Production readiness | Accessibility scan and keyboard handling, backup and restore, diagnostics, performance on a slow CPU, tests for every feature | Independent security review, tax-law review, real-device pilot (phones, scanners, printers), manual screen-reader testing, monitoring beyond the on-device error log |
+
+Wholesale (all four parts) is built: price lists and pack sizes, tax invoices and credit accounts, purchase orders, quotes and delivery notes.
+
 ## Gate 1 — Identity, tenancy and data ownership
 - Define independent-business tenant model and per-business Google Drive ownership.
 - Define Mwakete identity bridge without duplicating marketplace accounts.
