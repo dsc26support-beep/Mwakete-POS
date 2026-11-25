@@ -1346,3 +1346,140 @@ test("default deny: unknown collections are closed to everyone", async () => {
   );
   await assertFails(getDoc(ref(db(null), "businesses", OWNER)));
 });
+
+/* ---------- staff roles: cashier / manager / inventory / auditor ---------- */
+const MANAGER = "managerM",
+  INVENTORY = "inventoryI",
+  AUDITOR = "auditorA";
+async function seedRoles() {
+  await seed();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const d = ctx.firestore();
+    for (const [uid, role] of [
+      [MANAGER, "manager"],
+      [INVENTORY, "inventory"],
+      [AUDITOR, "auditor"],
+    ])
+      await setDoc(
+        doc(d, "businesses", OWNER, "staff", uid),
+        staff(uid, { role }),
+      );
+    await setDoc(
+      doc(d, "businesses", OWNER, "sales", "cs1"),
+      sale("cs1", CASHIER),
+    );
+  });
+}
+
+test("roles: the owner can set any known role, but not an unknown one", async () => {
+  const r = (role) =>
+    setDoc(
+      ref(db(OWNER), "businesses", OWNER, "staff", "newStaffX"),
+      staff("newStaffX", { role }),
+    );
+  await assertSucceeds(r("manager"));
+  await assertSucceeds(r("auditor"));
+  await assertSucceeds(r("inventory"));
+  await assertSucceeds(r("cashier"));
+  await assertFails(r("owner"));
+  await assertFails(r("admin"));
+});
+
+test("roles: who may sell", async () => {
+  await seedRoles();
+  const w = (uid) =>
+    setDoc(colDoc(uid, "sales", "x" + uid), sale("x" + uid, uid));
+  await assertSucceeds(w(CASHIER));
+  await assertSucceeds(w(MANAGER));
+  await assertFails(w(INVENTORY));
+  await assertFails(w(AUDITOR));
+});
+
+test("roles: who may read other people's sales", async () => {
+  await seedRoles();
+  const r = (uid) => getDoc(colDoc(uid, "sales", "cs1"));
+  await assertSucceeds(r(OWNER));
+  await assertSucceeds(r(CASHIER));
+  await assertSucceeds(r(MANAGER));
+  await assertSucceeds(r(AUDITOR));
+  await assertFails(r(INVENTORY));
+  await assertFails(r(OTHER));
+  await env.withSecurityRulesDisabled(async (ctx) =>
+    setDoc(
+      doc(ctx.firestore(), "businesses", OWNER, "staff", "cashier2"),
+      staff("cashier2"),
+    ),
+  );
+  await assertFails(r("cashier2"));
+});
+
+test("roles: catalogue and customers", async () => {
+  await seedRoles();
+  const p = (uid, id) => setDoc(colDoc(uid, "products", id), product(id));
+  await assertSucceeds(p(MANAGER, "pm"));
+  await assertSucceeds(p(INVENTORY, "pi"));
+  await assertFails(p(CASHIER, "pc"));
+  await assertFails(p(AUDITOR, "pa"));
+  await assertFails(deleteDoc(colDoc(MANAGER, "products", "pi")));
+  await assertFails(deleteDoc(colDoc(INVENTORY, "products", "pi")));
+  await assertSucceeds(deleteDoc(colDoc(OWNER, "products", "pm")));
+  const c = (uid, id) =>
+    setDoc(colDoc(uid, "customers", id), { id, name: "Trade Co" });
+  await assertSucceeds(c(MANAGER, "c1"));
+  await assertFails(c(INVENTORY, "c2"));
+  await assertFails(c(CASHIER, "c3"));
+  await assertSucceeds(getDoc(colDoc(AUDITOR, "products", "pi")));
+});
+
+test("roles: stock, suppliers and purchase orders", async () => {
+  await seedRoles();
+  const m = (uid, id) => setDoc(colDoc(uid, "stockMoves", id), move(id, uid));
+  await assertSucceeds(m(INVENTORY, "m1"));
+  await assertSucceeds(m(MANAGER, "m2"));
+  await assertSucceeds(m(CASHIER, "m3"));
+  await assertFails(m(AUDITOR, "m4"));
+  const s = (uid, id) =>
+    setDoc(colDoc(uid, "suppliers", id), supplier(id, { staffUid: uid }));
+  await assertSucceeds(s(INVENTORY, "s1"));
+  await assertSucceeds(s(MANAGER, "s2"));
+  await assertFails(s(CASHIER, "s3"));
+  await assertFails(s(AUDITOR, "s4"));
+  await assertFails(getDoc(colDoc(CASHIER, "suppliers", "s1")));
+  await assertFails(getDoc(colDoc(AUDITOR, "suppliers", "s1")));
+  await assertSucceeds(
+    setDoc(
+      colDoc(INVENTORY, "purchaseOrders", "o1"),
+      po("o1", { staffUid: INVENTORY }),
+    ),
+  );
+});
+
+test("roles: nobody but the owner manages staff or the business", async () => {
+  await seedRoles();
+  for (const uid of [CASHIER, MANAGER, INVENTORY, AUDITOR]) {
+    await assertFails(
+      setDoc(colDoc(uid, "staff", "newStaffY"), staff("newStaffY")),
+    );
+    await assertFails(
+      setDoc(ref(db(uid), "businesses", OWNER), business({ name: "Hijack" })),
+    );
+    await assertFails(
+      getDocs(collection(db(uid), "businesses", OWNER, "staff")),
+    );
+  }
+});
+
+test("roles: a deactivated manager loses everything", async () => {
+  await seedRoles();
+  await env.withSecurityRulesDisabled(async (ctx) =>
+    setDoc(
+      doc(ctx.firestore(), "businesses", OWNER, "staff", MANAGER),
+      staff(MANAGER, { role: "manager", active: false }),
+    ),
+  );
+  await assertFails(
+    setDoc(colDoc(MANAGER, "sales", "z1"), sale("z1", MANAGER)),
+  );
+  await assertFails(getDoc(colDoc(MANAGER, "sales", "cs1")));
+  await assertFails(setDoc(colDoc(MANAGER, "products", "pz"), product("pz")));
+});

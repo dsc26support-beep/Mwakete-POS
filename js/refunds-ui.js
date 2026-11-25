@@ -100,6 +100,16 @@ const RefundsUI = (() => {
       if (!r.ok) return toast(r.error);
       // Saved before anything else, so a refund is never lost; stock follows.
       await POSDB.put("refunds", r.value);
+      if (window.Audit)
+        Audit.log(
+          "refund",
+          (r.value.number || "") +
+            " " +
+            fmt(r.value.total) +
+            " (" +
+            r.value.method +
+            ")",
+        );
       for (const u of R.restockUnits(r.value)) {
         const p = await POSDB.get("products", u.productId);
         if (p)

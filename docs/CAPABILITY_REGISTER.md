@@ -152,7 +152,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-114 | View transaction details | Verified | details dialog (js/txn.js; tests/txn.test.js; e2e/txn) |
 | POS-115 | Transaction status | Verified | Completed / Partly or Fully refunded / On account / Not accepted by the cloud (js/txn.js; tests/txn.test.js; e2e/txn) |
 | POS-116 | Transaction export | Verified | CSV export of the filtered list, formulas neutralised (js/txn.js; tests/txn.test.js; e2e/txn) |
-| POS-117 | Transaction audit history | Partial | history is derived from the sale and its credit notes; no separate immutable log yet (batch 6) |
+| POS-117 | Transaction audit history | Partial | sale history is derived from records and credit notes; separate device activity log exists; no cloud audit trail |
 | POS-118 | Transaction cancellation controls | Partial | a sale cannot be edited or deleted; cancel = full refund (credit note) |
 | POS-119 | Transaction correction workflow | Partial | correction = refund + new sale; explained in the details dialog; no guided wizard |
 | POS-120 | Transaction integrity checks | Verified | TxnCore.checkIntegrity re-adds lines, discount and payments (js/txn.js; tests/txn.test.js; e2e/txn) |
@@ -200,14 +200,14 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-150 | Logout | Verified | |
 | POS-151 | Business data isolation | Verified | rules tests |
 | POS-152 | Staff accounts | Verified | |
-| POS-153 | Role-based permissions | Partial | owner and cashier only |
-| POS-154 | Cashier permissions | Verified | rules tests |
-| POS-155 | Manager permissions | Missing | |
-| POS-156 | Administrator permissions | Missing | |
+| POS-153 | Role-based permissions | Verified | owner + cashier, manager, inventory, auditor; enforced by Firestore rules (rules tests 50/50) |
+| POS-154 | Cashier permissions | Verified | cashier sells and refunds, reads own records only (rules tests) |
+| POS-155 | Manager permissions | Verified | manager: sells, manages catalogue/customers/stock/orders, reads all (rules tests) |
+| POS-156 | Administrator permissions | Partial | the owner is the administrator; no separate second-administrator role |
 | POS-157 | Authorization validation | Verified | rules |
-| POS-158 | Security audit log | Missing | |
+| POS-158 | Security audit log | Partial | tamper-evident hash-chained activity log on each device, exportable (js/security.js; e2e/security). Not yet synced to the cloud |
 | POS-159 | Secure offline data handling | Partial | not encrypted at rest |
-| POS-160 | Session management | Partial | Firebase sessions; no idle lock |
+| POS-160 | Session management | Verified | screen-lock PIN (salted, stretched), idle lock, lock-out after 5 wrong PINs (e2e/security). Protects against casual use only |
 | POS-161 | Data backup | Verified | backup e2e |
 | POS-162 | Recovery procedures | Partial | restore from file; no restore from cloud |
 

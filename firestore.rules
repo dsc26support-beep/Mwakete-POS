@@ -97,6 +97,31 @@ service cloud.firestore {
       return isOwner(businessId) || isActiveStaff(businessId);
     }
 
+    // Staff roles (set by the owner): cashier, manager, inventory, auditor. The owner can do everything.
+    //   cashier   sells and refunds; reads only their own records
+    //   manager   sells; manages products, customers, stock, suppliers, orders; reads every record
+    //   inventory manages products, stock, suppliers, orders; cannot sell
+    //   auditor   reads every record; cannot write anything
+    function hasRole(businessId, roles) {
+      return isActiveStaff(businessId)
+        && get(staffPath(businessId)).data.role in roles;
+    }
+    function canSell(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['cashier', 'manager']);
+    }
+    function canWriteStock(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['cashier', 'manager', 'inventory']);
+    }
+    function canManageCatalogue(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['manager', 'inventory']);
+    }
+    function canManageCustomers(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['manager']);
+    }
+    function canReadAll(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['manager', 'auditor']);
+    }
+
     function isShortString(value, maxLen) {
       return value is string && value.size() >= 1 && value.size() <= maxLen;
     }
@@ -163,7 +188,7 @@ service cloud.firestore {
         && isShortString(staffId, 128)
         && staffId != businessId
         && isShortString(d.name, 100)
-        && d.role == 'cashier'
+        && d.role in ['cashier', 'manager', 'inventory', 'auditor']
         && d.active is bool
         && d.createdAt is number;
     }
@@ -190,6 +215,7 @@ service cloud.firestore {
         && (!('syncStatus' in d) || (d.syncStatus is string && d.syncStatus.size() <= 20))
         && (!('discount' in d) || validDiscount(d.discount))
         && (!('receiptNo' in d) || isShortString(d.receiptNo, 30))
+        && (!('deviceId' in d) || isShortString(d.deviceId, 12))
         && (!('tendered' in d) || isMoney(d.tendered))
         && (!('change' in d) || isMoney(d.change))
         && (!('payments' in d) || validPayments(d))
@@ -404,7 +430,7 @@ service cloud.firestore {
 
     // The owner reads everything; a cashier reads only the records they wrote.
     function canReadRecord(businessId) {
-      return isOwner(businessId)
+      return canReadAll(businessId)
         || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
     }
 
@@ -428,7 +454,6 @@ service cloud.firestore {
         allow create: if isOwner(businessId) && validStaff(businessId, staffId);
         allow update: if isOwner(businessId)
           && validStaff(businessId, staffId)
-          && request.resource.data.role == resource.data.role
           && request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if false;
       }
@@ -438,20 +463,18 @@ service cloud.firestore {
       // safe (idempotent) but a stored sale can never be altered or removed.
       // Owner reads everything; a cashier reads only records they wrote.
       match /sales/{saleId} {
-        allow read: if isOwner(businessId)
-          || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
-        allow create: if isMember(businessId) && validSale(saleId) && writtenByCaller();
-        allow update: if isMember(businessId)
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validSale(saleId) && writtenByCaller();
+        allow update: if canSell(businessId)
           && request.resource.data == resource.data
           && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
       }
 
       match /payments/{paymentId} {
-        allow read: if isOwner(businessId)
-          || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
-        allow create: if isMember(businessId) && validPayment(paymentId) && writtenByCaller();
-        allow update: if isMember(businessId)
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validPayment(paymentId) && writtenByCaller();
+        allow update: if canSell(businessId)
           && request.resource.data == resource.data
           && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
@@ -459,23 +482,23 @@ service cloud.firestore {
 
       match /customers/{customerId} {
         allow read: if isMember(businessId);
-        allow create: if isOwner(businessId) && validCustomer(customerId);
-        allow update: if isOwner(businessId) && validCustomer(customerId);
+        allow create: if canManageCustomers(businessId) && validCustomer(customerId);
+        allow update: if canManageCustomers(businessId) && validCustomer(customerId);
         allow delete: if false;
       }
 
       match /products/{productId} {
         allow read: if isMember(businessId);
-        allow create: if isOwner(businessId) && validProduct(productId);
-        allow update: if isOwner(businessId) && validProduct(productId);
+        allow create: if canManageCatalogue(businessId) && validProduct(productId);
+        allow update: if canManageCatalogue(businessId) && validProduct(productId);
         allow delete: if isOwner(businessId);
       }
 
       // Credit notes: append-only, same idempotent re-send as sales.
       match /refunds/{refundId} {
         allow read: if canReadRecord(businessId);
-        allow create: if isMember(businessId) && validRefund(businessId, refundId) && writtenByCaller();
-        allow update: if isMember(businessId)
+        allow create: if canSell(businessId) && validRefund(businessId, refundId) && writtenByCaller();
+        allow update: if canSell(businessId)
           && request.resource.data == resource.data
           && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
@@ -484,8 +507,8 @@ service cloud.firestore {
       // Closed cash-drawer shifts: append-only.
       match /registers/{registerId} {
         allow read: if canReadRecord(businessId);
-        allow create: if isMember(businessId) && validRegister(registerId) && writtenByCaller();
-        allow update: if isMember(businessId)
+        allow create: if canSell(businessId) && validRegister(registerId) && writtenByCaller();
+        allow update: if canSell(businessId)
           && request.resource.data == resource.data
           && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
@@ -494,8 +517,8 @@ service cloud.firestore {
       // Stock movements: append-only audit trail.
       match /stockMoves/{moveId} {
         allow read: if canReadRecord(businessId);
-        allow create: if isMember(businessId) && validStockMove(moveId) && writtenByCaller();
-        allow update: if isMember(businessId)
+        allow create: if canWriteStock(businessId) && validStockMove(moveId) && writtenByCaller();
+        allow update: if canWriteStock(businessId)
           && request.resource.data == resource.data
           && resource.data.staffUid == request.auth.uid;
         allow delete: if false;
@@ -504,17 +527,17 @@ service cloud.firestore {
       // Suppliers and purchase orders: owner only. An order can be edited until it is received or cancelled,
       // and never rolled back to an older version.
       match /suppliers/{supplierId} {
-        allow read: if isOwner(businessId);
-        allow create: if isOwner(businessId) && validSupplier(supplierId) && writtenByCaller();
-        allow update: if isOwner(businessId) && validSupplier(supplierId) && writtenByCaller()
+        allow read: if canManageCatalogue(businessId);
+        allow create: if canManageCatalogue(businessId) && validSupplier(supplierId) && writtenByCaller();
+        allow update: if canManageCatalogue(businessId) && validSupplier(supplierId) && writtenByCaller()
           && request.resource.data.updatedAt >= resource.data.updatedAt;
         allow delete: if false;
       }
 
       match /purchaseOrders/{orderId} {
-        allow read: if isOwner(businessId);
-        allow create: if isOwner(businessId) && validPurchaseOrder(orderId) && writtenByCaller();
-        allow update: if isOwner(businessId) && validPurchaseOrder(orderId) && writtenByCaller()
+        allow read: if canManageCatalogue(businessId);
+        allow create: if canManageCatalogue(businessId) && validPurchaseOrder(orderId) && writtenByCaller();
+        allow update: if canManageCatalogue(businessId) && validPurchaseOrder(orderId) && writtenByCaller()
           && (request.resource.data == resource.data
               || (resource.data.status in ['draft', 'ordered']
                   && request.resource.data.updatedAt >= resource.data.updatedAt
@@ -525,8 +548,8 @@ service cloud.firestore {
       // Quotes: any member can write one; only the owner or the person who wrote it can change it, and only while open.
       match /quotes/{quoteId} {
         allow read: if canReadRecord(businessId);
-        allow create: if isMember(businessId) && validQuote(quoteId) && writtenByCaller();
-        allow update: if isMember(businessId) && validQuote(quoteId)
+        allow create: if canSell(businessId) && validQuote(quoteId) && writtenByCaller();
+        allow update: if canSell(businessId) && validQuote(quoteId)
           && request.resource.data.staffUid == resource.data.staffUid
           && request.resource.data.createdAt == resource.data.createdAt
           && (request.resource.data == resource.data

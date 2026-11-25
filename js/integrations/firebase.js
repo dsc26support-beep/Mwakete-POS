@@ -221,8 +221,12 @@ const FirebaseBackend = (() => {
         onDeny || ((id) => rejected.push({ id, ...denyReason })),
       );
 
-    // Owner only: trade customers and the product catalogue.
-    if (role === "owner") {
+    // Catalogue: the owner, plus managers (everything) and inventory staff (products only), as the rules allow.
+    const staffRole = opts.staffRole || "cashier";
+    const canCatalogue =
+      role === "owner" || staffRole === "manager" || staffRole === "inventory";
+    const canCustomers = role === "owner" || staffRole === "manager";
+    if (canCustomers) {
       for (const c of payload.customers || [])
         await write(
           "customers",
@@ -236,6 +240,8 @@ const FirebaseBackend = (() => {
           () => {},
           () => {},
         );
+    }
+    if (canCatalogue) {
       for (const p of payload.products || []) {
         const rec = productToCloud(p);
         await write(
@@ -266,7 +272,8 @@ const FirebaseBackend = (() => {
     // Owner-only kinds are skipped on a cashier device (the rules would refuse them anyway).
     for (const [sub, records] of Object.entries(payload.extra || {})) {
       if (!EXTRA_KINDS.includes(sub)) continue;
-      if (role === "cashier" && OWNER_ONLY_KINDS.includes(sub)) continue;
+      if (role === "cashier" && OWNER_ONLY_KINDS.includes(sub) && !canCatalogue)
+        continue;
       const ok = (acceptedExtra[sub] = []);
       for (const rec of records || [])
         await write(sub, { ...rec, staffUid: uid }, (id) => ok.push(id));
@@ -430,6 +437,8 @@ const FirebaseBackend = (() => {
     need();
     if (!user) throw new Error("Sign in first.");
   };
+  const ROLES = ["cashier", "manager", "inventory", "auditor"];
+  let staffRole = "cashier"; // the role the owner gave this account (read from the staff record)
   const role = () =>
     businessId && user && businessId !== user.uid ? "cashier" : "owner";
   const bid = () => (role() === "cashier" ? businessId : user && user.uid);
@@ -558,11 +567,17 @@ const FirebaseBackend = (() => {
           "That business has not added you as active staff. Send them your staff code.",
         );
       businessId = c;
+      staffRole = ROLES.includes(snap.data().role)
+        ? snap.data().role
+        : "cashier";
       return c;
     },
     leaveBusiness() {
       businessId = null;
+      staffRole = "cashier";
     },
+    staffRole: () => (role() === "owner" ? "owner" : staffRole),
+    ROLES,
     // Owner: staff management.
     async listStaff() {
       needUser();
@@ -572,7 +587,7 @@ const FirebaseBackend = (() => {
       );
       return snap.docs.map((d) => d.data());
     },
-    async saveStaff(staffUid, name, active) {
+    async saveStaff(staffUid, name, active, staffRoleChoice) {
       needUser();
       if (role() !== "owner")
         throw new Error("Only the owner can manage staff.");
@@ -592,7 +607,11 @@ const FirebaseBackend = (() => {
       await setDoc(ref, {
         uid: id,
         name: n,
-        role: "cashier",
+        role: ROLES.includes(staffRoleChoice)
+          ? staffRoleChoice
+          : old.exists() && ROLES.includes(old.data().role)
+            ? old.data().role
+            : "cashier",
         active: !!active,
         createdAt: old.exists() ? old.data().createdAt : Date.now(),
       });
@@ -612,6 +631,7 @@ const FirebaseBackend = (() => {
       return syncWith(sdk.fsMod, db, user.uid, payload, {
         businessId: bid(),
         role: r,
+        staffRole,
       });
     },
     async fetchReport(since) {

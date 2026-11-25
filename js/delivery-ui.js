@@ -141,6 +141,11 @@ const DeliveryUI = (() => {
       r = D.move(q, "Sending");
       if (!r.ok) return toast(r.error);
       openLink(link.url);
+      if (window.Audit)
+        Audit.log(
+          "receipt-send",
+          D.CHANNELS[q.channel] + " receipt for sale " + q.saleId.slice(0, 8),
+        );
       toast("Opening your app. Press Send there, then come back and confirm.");
     } else if (what === "done") r = D.move(q, "Delivered");
     else if (what === "fail") r = D.move(q, "Failed");

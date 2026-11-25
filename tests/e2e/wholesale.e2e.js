@@ -510,7 +510,9 @@ const eq = (a, b, m) => {
   );
 
   console.log("Offline reload");
-  await page.waitForTimeout(1500);
+  // The offline reload needs the service worker to have finished caching the app.
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForTimeout(2500);
   await ctx.setOffline(true);
   await page.reload();
   await page.waitForSelector("#productGrid .product-card");

@@ -184,6 +184,14 @@ const CatalogueUI = (() => {
       next.image = url;
     }
     await POSDB.put("products", next);
+    if (window.Audit)
+      Audit.log(
+        "product-edit",
+        next.name +
+          (next.price !== editing.price
+            ? ": price " + fmt(editing.price) + " to " + fmt(next.price)
+            : ""),
+      );
     $("productEditPanel").classList.add("hidden");
     editing = null;
     await refresh();
@@ -202,6 +210,11 @@ const CatalogueUI = (() => {
     if (!r.changed.length) return toast("Nothing changed.");
     if (!confirm("Change " + r.changed.length + " product(s)?")) return;
     for (const p of r.changed) await POSDB.put("products", p);
+    if (window.Audit)
+      Audit.log(
+        "product-bulk",
+        r.changed.length + " product(s): " + type + (raw ? " " + raw : ""),
+      );
     selected.clear();
     $("prodSelectAll").checked = false;
     await refresh();

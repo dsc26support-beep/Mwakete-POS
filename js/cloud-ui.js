@@ -33,6 +33,18 @@ const CloudUI = (() => {
     FB().setBusiness(id);
   }
 
+  const ROLE_LABEL = {
+    cashier: "Cashier",
+    manager: "Manager",
+    inventory: "Inventory staff",
+    auditor: "Auditor (read only)",
+  };
+  // Can this signed-in person make sales? (The cloud rules enforce it too; this stops a pointless attempt.)
+  function canSell() {
+    const f = FB();
+    if (!f.isSignedIn() || f.role() === "owner") return true;
+    return ["cashier", "manager"].includes(f.staffRole());
+  }
   async function renderStaff() {
     const box = $("staffList");
     if (!FB().isSignedIn() || !FB().isVerified() || FB().role() !== "owner")
@@ -43,10 +55,17 @@ const CloudUI = (() => {
         ? staff
             .map(
               (s) =>
-                `<div class="sale-row"><div><strong>${esc(s.name)}</strong><small>${s.active ? "Active" : "Removed"} · <code>${esc(s.uid)}</code></small></div><button class="text-button" type="button" data-staff="${esc(s.uid)}" data-name="${esc(s.name)}" data-active="${s.active ? "1" : "0"}">${s.active ? "Remove access" : "Restore access"}</button></div>`,
+                `<div class="sale-row"><div><strong>${esc(s.name)}</strong><small>${s.active ? "Active" : "Removed"} · ${esc(ROLE_LABEL[s.role] || "Cashier")} · <code>${esc(s.uid)}</code></small></div><div class="row-actions"><select data-staff-role="${esc(s.uid)}" data-name="${esc(s.name)}" data-active="${s.active ? "1" : "0"}" aria-label="Role for ${esc(s.name)}">${FB()
+                  .ROLES.map(
+                    (r) =>
+                      `<option value="${r}"${r === (s.role || "cashier") ? " selected" : ""}>${ROLE_LABEL[r]}</option>`,
+                  )
+                  .join(
+                    "",
+                  )}</select><button class="text-button" type="button" data-staff="${esc(s.uid)}" data-name="${esc(s.name)}" data-active="${s.active ? "1" : "0"}" data-role="${esc(s.role || "cashier")}">${s.active ? "Remove access" : "Restore access"}</button></div></div>`,
             )
             .join("")
-        : '<p class="empty">No cashiers yet.</p>';
+        : '<p class="empty">No staff yet.</p>';
     } catch (e) {
       box.innerHTML = '<p class="muted">Could not load staff right now.</p>';
     }
@@ -64,7 +83,11 @@ const CloudUI = (() => {
           f.email() +
           ". Email not verified yet, so nothing syncs."
         : cashier
-          ? "Signed in as " + f.email() + " (cashier)."
+          ? "Signed in as " +
+            f.email() +
+            " (" +
+            (ROLE_LABEL[f.staffRole()] || "cashier").toLowerCase() +
+            ")."
           : "Signed in as " +
             f.email() +
             ". Sales and products sync to your cloud account.";
@@ -79,14 +102,22 @@ const CloudUI = (() => {
       $("cloudMyCode").textContent = f.uid();
     }
     // Cashiers cannot edit the catalogue (the cloud rules enforce it; this just hides the form).
+    // Managers and inventory staff may manage products; cashiers and auditors may not.
+    const sr = signedIn ? f.staffRole() : "owner";
+    const limited = cashier && !["manager", "inventory"].includes(sr);
     const pf = $("productForm");
-    if (pf) pf.classList.toggle("hidden", cashier);
-    // Screens that are the owner's business (purchasing) are hidden from cashiers; the rules refuse them anyway.
+    if (pf) pf.classList.toggle("hidden", limited);
+    // Screens that are the owner's business (purchasing) are hidden from limited roles; the rules refuse them anyway.
     document
       .querySelectorAll("[data-owner-only]")
-      .forEach((el) => el.classList.toggle("role-hidden", cashier));
+      .forEach((el) => el.classList.toggle("role-hidden", limited));
     // Lets dynamically drawn owner-only buttons (product edit / archive / remove) hide too.
-    document.body.classList.toggle("role-cashier", cashier);
+    for (const c of [...document.body.classList])
+      if (c.startsWith("role-") && c !== "role-hidden")
+        document.body.classList.remove(c);
+    document.body.classList.toggle("role-cashier", limited);
+    document.body.classList.add("role-" + sr);
+    document.body.classList.toggle("cannot-sell", !canSell());
     renderStaff();
   }
 
@@ -116,7 +147,10 @@ const CloudUI = (() => {
     if (!$("cloudPanel") || typeof FirebaseBackend === "undefined") return;
     $("cloudForm").addEventListener("submit", (e) => {
       e.preventDefault();
-      run($("cloudSignIn"), () => FB().signIn(...creds()));
+      run($("cloudSignIn"), async () => {
+        await FB().signIn(...creds());
+        if (window.Audit) Audit.log("sign-in", FB().email() || "");
+      });
     });
     $("cloudSignUp").addEventListener("click", () =>
       run($("cloudSignUp"), async () => {
@@ -134,6 +168,7 @@ const CloudUI = (() => {
     );
     $("cloudSignOut").addEventListener("click", () =>
       run($("cloudSignOut"), async () => {
+        if (window.Audit) await Audit.log("sign-out", FB().email() || "");
         await FB().signOut();
         toast("Signed out. Unsent sales stay on this device.");
       }),
@@ -162,9 +197,19 @@ const CloudUI = (() => {
       const form = e.currentTarget; // currentTarget is null after an await, so keep a reference
       const f = form.elements;
       run(form.querySelector("button"), async () => {
-        await FB().saveStaff(f.staffCode.value, f.staffName.value, true);
+        await FB().saveStaff(
+          f.staffCode.value,
+          f.staffName.value,
+          true,
+          f.staffRole ? f.staffRole.value : "cashier",
+        );
+        if (window.Audit)
+          Audit.log(
+            "staff-change",
+            "Added " + f.staffName.value + " as " + f.staffRole.value,
+          );
         form.reset();
-        toast("Cashier added.");
+        toast("Staff member added.");
         await renderStaff();
       });
     });
@@ -176,7 +221,22 @@ const CloudUI = (() => {
           b.dataset.staff,
           b.dataset.name,
           b.dataset.active !== "1",
+          b.dataset.role,
         );
+        await renderStaff();
+      });
+    });
+    $("staffList").addEventListener("change", (e) => {
+      const s = e.target.closest("[data-staff-role]");
+      if (!s) return;
+      run(s, async () => {
+        await FB().saveStaff(
+          s.dataset.staffRole,
+          s.dataset.name,
+          s.dataset.active === "1",
+          s.value,
+        );
+        toast("Role changed.");
         await renderStaff();
       });
     });
@@ -221,5 +281,5 @@ const CloudUI = (() => {
     start();
     window.addEventListener("online", () => start());
   }
-  return { init };
+  return { init, canSell, ROLE_LABEL };
 })();

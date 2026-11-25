@@ -82,6 +82,29 @@ test("a cashier never pushes products or customers, never deletes, and gets no b
   assert.deepEqual(r.acceptedProducts, []);
 });
 
+test("staff roles decide what a device pushes: manager = catalogue+customers+orders, inventory = catalogue+orders, others none", async () => {
+  const payload = () => ({
+    products: [prod("pp")],
+    customers: [{ id: "c1", name: "Trade" }],
+    extra: { purchaseOrders: [{ id: "o1", number: "PO-1" }] },
+  });
+  const run = async (staffRole) => {
+    const f = fakeFs();
+    await syncWith(f, {}, "STAFF1", payload(), {
+      businessId: "OWNER1",
+      role: "cashier",
+      staffRole,
+    });
+    const has = (p) => f.store.has("businesses/OWNER1/" + p);
+    return [has("products/pp"), has("customers/c1"), has("purchaseOrders/o1")];
+  };
+  assert.deepEqual(await run("manager"), [true, true, true]);
+  assert.deepEqual(await run("inventory"), [true, false, true]);
+  assert.deepEqual(await run("cashier"), [false, false, false]);
+  assert.deepEqual(await run("auditor"), [false, false, false]);
+  assert.deepEqual(await run(undefined), [false, false, false]);
+});
+
 test("the owner pushes a dirty product and the server's confirmation is reported", async () => {
   const f = fakeFs();
   const r = await syncWith(f, {}, "U1", {
@@ -378,7 +401,9 @@ test("firestore.rules: verified email, roles, staff stamp and product ownership 
   assert.match(r, /request\.resource\.data\.staffUid == request\.auth\.uid/);
   assert.match(
     r,
-    /match \/products\/\{productId\}[\s\S]*allow create: if isOwner/,
+    /match \/products\/\{productId\}[\s\S]*allow create: if canManageCatalogue/,
   );
+  assert.match(r, /function canSell\(businessId\)/);
+  assert.match(r, /hasRole\(businessId, \['manager', 'auditor'\]\)/);
   assert.match(r, /match \/staff\/\{staffId\}[\s\S]*allow delete: if false/);
 });

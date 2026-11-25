@@ -273,6 +273,13 @@ const server = http.createServer((req, res) => {
   await scan("product edit dialog");
   await page.click("#productEditCancel");
   await scan("product list with alerts and bulk bar");
+  await page.evaluate(() =>
+    document.getElementById("lockScreen").classList.remove("hidden"),
+  );
+  await scan("lock screen");
+  await page.evaluate(() =>
+    document.getElementById("lockScreen").classList.add("hidden"),
+  );
   await page.click('.tab[data-view="setup"]');
   await scan("signed-out cloud account panel");
 

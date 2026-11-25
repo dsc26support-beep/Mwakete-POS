@@ -357,6 +357,6 @@ const eq = (a, b, m) => {
   server.close();
   console.log("\n" + passed + " browser checks passed");
 })().catch((e) => {
-  console.error("\nFAILED:", e.message);
+  console.error("\nFAILED:", e.message, (e.stack || "").split("\n").filter((l) => l.includes("e2e")).slice(0, 2).join(" | "));
   process.exit(1);
 });

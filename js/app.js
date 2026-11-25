@@ -26,6 +26,7 @@ async function refresh() {
   $("settingsForm").elements.apiUrl.value = map.apiUrl || "";
   if (window.RetailUI) await RetailUI.render();
   if (window.AnalyticsUI) await AnalyticsUI.render();
+  if (window.SecurityUI) await SecurityUI.render();
   if (window.RegisterUI) await RegisterUI.render();
   if (window.StockUI) await StockUI.render();
   if (window.QuotesUI) await QuotesUI.render();
@@ -94,9 +95,13 @@ function renderCart() {
 /* Crash recovery: the unfinished sale in the cart is kept on the device, so a dead battery or a closed tab does not lose it.
  * It is cleared by the same code path that empties the cart (a completed sale or "Clear"). */
 let draftTimer;
+// Nothing is written until the saved draft has been read at start-up: the first (empty) cart render must never
+// overwrite the draft before it is restored, however long start-up takes on a slow phone.
+let draftReady = false;
 function saveDraft() {
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
+    if (!draftReady) return;
     const value = cart.map((x) => ({
       id: x.id,
       productId: x.productId || x.id,
@@ -115,6 +120,7 @@ function saveDraft() {
 }
 async function restoreDraft() {
   const d = (await POSDB.get("settings", "cartDraft"))?.value;
+  draftReady = true; // the draft is in memory now, so saving may begin
   if (!Array.isArray(d) || !d.length || cart.length) return;
   const prods = await POSDB.all("products");
   const byId = new Map(prods.map((p) => [p.id, p]));
@@ -227,6 +233,8 @@ document.addEventListener("click", async (e) => {
   if (del) {
     const gone = products.find((x) => x.id === del.dataset.delete);
     await POSDB.remove("products", del.dataset.delete);
+    if (window.Audit)
+      Audit.log("product-remove", gone ? gone.name : del.dataset.delete);
     // A product that reached the cloud leaves a removal marker, so the delete can be sent on the next sync.
     if (gone && gone.cloudSyncedAt) {
       const cur =
@@ -285,6 +293,8 @@ $("productForm").addEventListener("submit", async (e) => {
 });
 $("checkout").addEventListener("click", async () => {
   if (!cart.length) return;
+  if (typeof CloudUI !== "undefined" && !CloudUI.canSell())
+    return toast("Your staff role cannot make sales.");
   const method = $("paymentMethod").value;
   if (
     !window.CheckoutUI &&
@@ -315,7 +325,11 @@ $("checkout").addEventListener("click", async () => {
     };
   if (window.RetailUI && !(await RetailUI.decorateSale(sale, cart))) return;
   if (window.CheckoutUI && !CheckoutUI.apply(sale)) return;
-  if (window.TxnCore) sale.receiptNo = await TxnCore.nextReceiptNumber(POSDB);
+  if (window.TxnCore) {
+    sale.receiptNo = await TxnCore.nextReceiptNumber(POSDB);
+    const dev = (await POSDB.get("settings", "deviceCode"))?.value;
+    if (dev) sale.deviceId = dev; // which till made the sale (device codes are random, not personal)
+  }
   await POSDB.put("sales", sale);
   for (const line of cart) {
     const p = products.find((x) => x.id === (line.productId || line.id));
@@ -399,6 +413,7 @@ window.addEventListener("offline", connection);
   await TxnUI.init();
   await DeliveryUI.init();
   await AnalyticsUI.init();
+  await SecurityUI.init();
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();

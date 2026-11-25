@@ -182,6 +182,7 @@ const eq = (a, b, msg) => {
       "change",
       "createdAt",
       "currency",
+      "deviceId",
       "id",
       "items",
       "paymentMethod",

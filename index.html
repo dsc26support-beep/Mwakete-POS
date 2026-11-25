@@ -342,6 +342,26 @@
       </div>
     </section>
     <section id="view-setup" class="view hidden">
+      <div class="panel setup-panel" id="securityPanel">
+        <p class="eyebrow">SECURITY</p><h2>This device and screen lock</h2>
+        <p class="muted">These protections live on this device. They stop casual misuse and make changes to the activity log detectable. They cannot stop someone who controls the device itself, so keep backups and use cloud sign-in for staff.</p>
+        <form id="deviceForm" class="settings-form">
+          <label>Device name<input name="deviceName" maxlength="30" placeholder="e.g. Front till"></label>
+          <p class="hint">Device code: <code id="deviceCodeText">…</code> · App version <span id="appVersionText"></span> · Storage kept by the browser: <span id="persistText">unknown</span></p>
+          <div class="row-actions"><button class="button primary" type="submit">Save name</button><button class="button secondary" type="button" id="persistBtn">Ask the browser to keep my data</button></div>
+        </form>
+        <form id="pinForm" class="settings-form">
+          <label>Lock PIN (4 to 8 digits)<input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>
+          <label>Lock after idle<select name="idle" id="idleSelect"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></label>
+          <p id="pinState" class="hint" role="status"></p>
+          <div class="row-actions"><button class="button primary" type="submit">Save lock settings</button><button class="button secondary" type="button" id="lockNow">Lock now</button><button class="button secondary" type="button" id="pinClear">Remove PIN</button></div>
+        </form>
+        <h3>Activity log</h3>
+        <div class="filter-row" role="search"><input id="auditText" type="search" placeholder="Search the log" aria-label="Search the activity log"><select id="auditAction" aria-label="Type"><option value="">All activity</option></select></div>
+        <p id="auditState" class="hint" role="status"></p>
+        <div class="row-actions"><button id="auditExport" class="button secondary" type="button">Export log (CSV)</button></div>
+        <div id="auditList"></div>
+      </div>
       <div class="panel setup-panel">
         <p class="eyebrow">BUSINESS TYPE</p><h2>Choose your POS</h2>
         <p class="muted">Pick what fits your business. You can change this later; your products and sales are kept.</p>
@@ -412,12 +432,13 @@
             <h4>Your business code</h4>
             <p class="muted">Staff need this code to join your business. It is not a password, but share it only with people you trust.</p>
             <p><code id="cloudBizCode"></code> <button class="text-button" type="button" id="cloudCopyBiz">Copy</button></p>
-            <h4>Staff (cashiers)</h4>
-            <p class="muted">A cashier creates their own account, verifies their email, and sends you their <b>staff code</b>. Cashiers can sell and see the product list. They cannot change products, customers or staff, and they only see their own sales.</p>
+            <h4>Staff</h4>
+            <p class="muted">A staff member creates their own account, verifies their email, and sends you their <b>staff code</b>. <b>Cashier</b>: sells and refunds, sees only their own sales. <b>Manager</b>: also manages products, customers, stock and orders, and sees every sale. <b>Inventory staff</b>: manages products, stock and orders, cannot sell. <b>Auditor</b>: can read everything, changes nothing. Only you manage staff and the business.</p>
             <form id="staffForm" class="settings-form">
               <label>Staff code<input name="staffCode" maxlength="128" autocomplete="off" required></label>
               <label>Name<input name="staffName" maxlength="100" required></label>
-              <button class="button primary" type="submit">Add cashier</button>
+              <label>Role<select name="staffRole"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="inventory">Inventory staff</option><option value="auditor">Auditor (read only)</option></select></label>
+              <button class="button primary" type="submit">Add staff member</button>
             </form>
             <div id="staffList"></div>
           </div>
@@ -511,6 +532,17 @@
       </form>
     </div>
   </div>
+  <div id="lockScreen" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+    <div class="modal-card">
+      <h3 id="lockTitle">Locked</h3>
+      <p class="muted">Enter your PIN to continue. Your sales and the cart are safe.</p>
+      <form id="lockForm" class="settings-form">
+        <label>PIN<input name="pin" id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" required></label>
+        <p id="lockError" class="low" role="alert"></p>
+        <button class="button primary" type="submit">Unlock</button>
+      </form>
+    </div>
+  </div>
   <div id="txnPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="txnTitle">
     <div class="modal-card">
       <h3 id="txnTitle">Sale details</h3>
@@ -556,6 +588,7 @@
   <script src="./js/txn.js"></script>
   <script src="./js/delivery.js"></script>
   <script src="./js/analytics.js"></script>
+  <script src="./js/security.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
   <script src="./js/cloudreport.js"></script>
@@ -576,6 +609,7 @@
   <script src="./js/txn-ui.js"></script>
   <script src="./js/delivery-ui.js"></script>
   <script src="./js/analytics-ui.js"></script>
+  <script src="./js/security-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
   <script src="./js/csv-ui.js"></script>

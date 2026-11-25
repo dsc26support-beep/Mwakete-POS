@@ -85,6 +85,8 @@ const RegisterUI = (() => {
       const r = G.buildOpen(form.elements.float.value, { id: uid() });
       if (!r.ok) return toast(r.error);
       await POSDB.put("settings", { key: KEY, value: r.value });
+      if (window.Audit)
+        Audit.log("register-open", "Float " + fmt(r.value.openingFloat));
       form.reset();
       await render();
       toast("Register open.");
@@ -117,6 +119,14 @@ const RegisterUI = (() => {
         return;
       // The closed shift is saved first; only then is the open shift cleared, so a shift is never lost.
       await POSDB.put("registers", r.value);
+      if (window.Audit)
+        Audit.log(
+          "register-close",
+          "Counted " +
+            fmt(r.value.countedCash) +
+            ", difference " +
+            fmt(r.value.difference),
+        );
       await POSDB.remove("settings", KEY);
       form.reset();
       await render();

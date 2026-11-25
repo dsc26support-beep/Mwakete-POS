@@ -74,6 +74,8 @@ const BackupUI = (() => {
     for (const [store, recs] of Object.entries(pending.stores))
       for (const r of recs) (await POSDB.put(store, r), n++);
     pending = null;
+    if (window.Audit)
+      await Audit.log("backup-restore", n + " records restored");
     toast(n + " records restored. Reloading…");
     setTimeout(() => location.reload(), 900); // the simplest way to redraw every screen from the restored data
   }
