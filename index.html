@@ -89,6 +89,21 @@
           <button class="button primary" type="submit">Add product</button>
         </form>
         <div id="productTable" class="table-wrap"></div>
+        <details id="csvPanel" class="csv-box" data-owner-only>
+          <summary>Import or export products (CSV file)</summary>
+          <p class="hint">Use a file saved from Excel or Google Sheets as <strong>CSV</strong>. The first row must be headings such as <code>name, price, stock, barcode</code>. Nothing is saved until you press <strong>Import</strong>, and existing stock counts are kept unless you choose otherwise.</p>
+          <div class="row-actions">
+            <label class="button secondary">Choose a CSV file<input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden></label>
+            <button class="button secondary" type="button" id="csvExport">Export products</button>
+          </div>
+          <div id="csvMap" class="settings-form hidden"></div>
+          <div id="csvPreview" aria-live="polite"></div>
+          <div id="csvOptions" class="settings-form hidden">
+            <label>If a product already exists<select id="csvDup"><option value="skip">Skip it</option><option value="update">Update its price and details</option></select></label>
+            <label class="check"><input type="checkbox" id="csvStock"> Also replace the stock count when updating</label>
+            <button class="button primary" type="button" id="csvImport">Import</button>
+          </div>
+        </details>
       </div>
       <div class="panel hidden" data-feature="lowStock">
         <p class="eyebrow">STOCK ALERTS</p><h2>Low stock</h2>
@@ -250,6 +265,15 @@
         <div class="section-heading"><div><p class="eyebrow">RETAIL</p><h2>Reports</h2></div></div>
         <div id="reportBody"></div>
       </div>
+      <div class="panel" id="cloudReportPanel" data-owner-only>
+        <div class="section-heading"><div><p class="eyebrow">CLOUD ACCOUNT</p><h2>Whole business</h2></div></div>
+        <p class="hint">Adds up the sales and credit notes of <strong>every till and cashier</strong> from your cloud account. It needs an internet connection and a signed-in, verified account. Sales still waiting to sync from a device are not included yet.</p>
+        <form id="cloudReportForm" class="settings-form">
+          <label>Period<select id="cloudReportRange"><option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option></select></label>
+          <button class="button primary" type="submit">Show report</button>
+        </form>
+        <div id="cloudReportBody" aria-live="polite"></div>
+      </div>
     </section>
     <section id="view-setup" class="view hidden">
       <div class="panel setup-panel">
@@ -395,6 +419,8 @@
   <script src="./js/cloud-ui.js"></script>
   <script src="./js/refunds.js"></script>
   <script src="./js/register.js"></script>
+  <script src="./js/cloudreport.js"></script>
+  <script src="./js/csv.js"></script>
   <script src="./js/stock.js"></script>
   <script src="./js/trade.js"></script>
   <script src="./js/invoices.js"></script>
@@ -406,6 +432,8 @@
   <script src="./js/invoices-ui.js"></script>
   <script src="./js/refunds-ui.js"></script>
   <script src="./js/register-ui.js"></script>
+  <script src="./js/csv-ui.js"></script>
+  <script src="./js/cloudreport-ui.js"></script>
   <script src="./js/stock-ui.js"></script>
   <script src="./js/quotes-ui.js"></script>
   <script src="./js/purchasing-ui.js"></script>

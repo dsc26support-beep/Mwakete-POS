@@ -423,6 +423,45 @@ const stamp = Date.now();
     "and the quote points at it",
   );
   console.log("ok: quote converted to an invoice, both synced");
+
+  /* ----- the owner's whole-business report adds up every till and cashier ----- */
+  await tab(owner, "reports");
+  await owner.click('#cloudReportForm button[type="submit"]');
+  await owner.waitForFunction(
+    () =>
+      /By person/.test(document.getElementById("cloudReportBody").textContent),
+    null,
+    { timeout: 30000 },
+  );
+  const rep = (await owner.innerText("#cloudReportBody")).replace(/\s+/g, " ");
+  assert.match(
+    rep,
+    /3 sale\(s\)/,
+    "3 sales: owner's sale, owner's invoice, cashier's sale",
+  );
+  assert.match(
+    rep,
+    /sales 12\.75/,
+    "12.75 = 3.00 + 6.75 (invoice with tax) + 3.00",
+  );
+  assert.match(rep, /credit notes −6\.00 \(2\)/, "both credit notes");
+  assert.match(rep, /net 6\.75/);
+  assert.match(
+    rep,
+    /Tina Cashier 1 3\.00/,
+    "the cashier appears by name with their one sale",
+  );
+  assert.match(rep, /Owner 2 9\.75/, "and the owner with two");
+  assert.equal(
+    await cash.evaluate(() =>
+      document
+        .getElementById("cloudReportPanel")
+        .classList.contains("role-hidden"),
+    ),
+    true,
+    "cashiers do not get the whole-business report",
+  );
+  console.log("ok: owner's whole-business report adds up both people");
   const salesBeforeDeactivation = (
     (await rest("businesses/" + ownerUid + "/sales")).documents || []
   ).length;

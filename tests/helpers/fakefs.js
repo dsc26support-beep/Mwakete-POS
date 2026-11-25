@@ -6,12 +6,24 @@ function fakeFs({ failWith = {}, existing = {} } = {}) {
     if (failWith[id])
       throw Object.assign(new Error("x"), { code: failWith[id] });
   };
+  const OPS = {
+    "==": (a, b) => a === b,
+    ">=": (a, b) => a >= b,
+  };
   return {
     store,
     doc: (_db, ...p) => p.join("/"),
     collection: (_db, ...p) => ({ col: p.join("/") }),
     where: (f, op, v) => ({ f, op, v }),
-    query: (c, w) => ({ ...c, w }),
+    orderBy: (f, dir) => ({ ord: f, dir }),
+    limit: (n) => ({ lim: n }),
+    // query(collection, ...clauses): a single where() is the common case, as before.
+    query: (c, ...clauses) => ({
+      ...c,
+      w: clauses.find((x) => x.op),
+      ord: clauses.find((x) => x.ord),
+      lim: clauses.find((x) => x.lim),
+    }),
     setDoc: async (ref, data) => {
       fail(ref);
       store.set(ref, data);
@@ -20,16 +32,24 @@ function fakeFs({ failWith = {}, existing = {} } = {}) {
       fail(ref);
       store.delete(ref);
     },
-    getDocs: async (q) => ({
-      docs: [...store.entries()]
+    getDocs: async (q) => {
+      let docs = [...store.entries()]
         .filter(
           ([k, v]) =>
             k.startsWith(q.col + "/") &&
             !k.slice(q.col.length + 1).includes("/") &&
-            (!q.w || v[q.w.f] === q.w.v),
+            (!q.w || OPS[q.w.op](v[q.w.f], q.w.v)),
         )
-        .map(([, v]) => ({ data: () => v })),
-    }),
+        .map(([, v]) => v);
+      if (q.ord)
+        docs.sort((a, b) =>
+          q.ord.dir === "desc"
+            ? b[q.ord.ord] - a[q.ord.ord]
+            : a[q.ord.ord] - b[q.ord.ord],
+        );
+      if (q.lim) docs = docs.slice(0, q.lim.lim);
+      return { docs: docs.map((v) => ({ data: () => v })) };
+    },
   };
 }
 module.exports = { fakeFs };

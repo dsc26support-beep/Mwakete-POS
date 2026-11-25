@@ -292,6 +292,8 @@ window.addEventListener("offline", connection);
   await RefundsUI.init();
   await RegisterUI.init();
   await StockUI.init();
+  await CsvUI.init();
+  await CloudReportUI.init();
   await QuotesUI.init();
   await PurchasingUI.init();
   await HelpCentre.init();

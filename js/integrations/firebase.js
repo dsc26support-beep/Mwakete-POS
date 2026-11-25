@@ -338,6 +338,33 @@ const FirebaseBackend = (() => {
     };
   }
 
+  // Reads the whole business (owner only): every till's sales and credit notes since `since`, plus the staff list.
+  // Capped at 5000 newest records of each kind so a very large history cannot freeze a phone; `capped` says so.
+  async function reportWith(fs, dbRef, uid, since, opts = {}) {
+    const LIMIT = opts.limit || 5000;
+    const base = ["businesses", uid];
+    const q = (sub) =>
+      fs.query(
+        fs.collection(dbRef, ...base, sub),
+        fs.where("createdAt", ">=", since),
+        fs.orderBy("createdAt", "desc"),
+        fs.limit(LIMIT),
+      );
+    const [ss, rs, st] = await Promise.all([
+      fs.getDocs(q("sales")),
+      fs.getDocs(q("refunds")),
+      fs.getDocs(fs.collection(dbRef, ...base, "staff")),
+    ]);
+    const sales = ss.docs.map((d) => d.data());
+    const refunds = rs.docs.map((d) => d.data());
+    return {
+      sales,
+      refunds,
+      staff: st.docs.map((d) => d.data()),
+      capped: sales.length >= LIMIT || refunds.length >= LIMIT,
+    };
+  }
+
   /* ---------- SDK loading and auth ---------- */
   function load() {
     if (loading) return loading;
@@ -571,9 +598,28 @@ const FirebaseBackend = (() => {
         role: r,
       });
     },
+    async fetchReport(since) {
+      needUser();
+      if (!user.emailVerified) throw new Error("Verify your email first.");
+      if (role() !== "owner")
+        throw new Error("Only the owner can see the whole-business report.");
+      try {
+        return await withTimeout(
+          reportWith(sdk.fsMod, db, user.uid, Number(since) || 0),
+          30000,
+        );
+      } catch (e) {
+        throw new Error(
+          e && e.code === "permission-denied"
+            ? "The cloud refused the report. Sign in again."
+            : "Could not load the report. Check your internet connection.",
+        );
+      }
+    },
     mergeProducts,
     isDirty,
     _test: {
+      reportWith,
       toRecord,
       computeBalance,
       syncWith,
