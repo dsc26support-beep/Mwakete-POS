@@ -48,6 +48,27 @@ test("links open the right app with the text encoded", () => {
   );
 });
 
+test("a line break in the subject (for example from a business name) never reaches the link or the queue", () => {
+  const m = D.make({
+    saleId: "s",
+    channel: "email",
+    to: "x@y.com",
+    subject: "Shop\r\nBcc: z@z.com",
+    text: "t",
+  });
+  assert.equal(m.item.subject, "Shop Bcc: z@z.com");
+  const l = D.buildLink({
+    channel: "email",
+    to: "x@y.com",
+    subject: "A\r\nBcc: z",
+    text: "b",
+  });
+  assert.ok(
+    !/%0[Dd]|%0[Aa]/.test(l.url.split("&body=")[0]),
+    "no encoded line break in the subject part",
+  );
+});
+
 test("no header injection: line breaks stay inside the encoded body", () => {
   const l = D.buildLink({
     channel: "email",

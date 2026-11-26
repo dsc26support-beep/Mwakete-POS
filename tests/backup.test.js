@@ -89,6 +89,60 @@ test("device-specific settings are never restored, even if a file contains them"
   );
 });
 
+test("a crafted file cannot redirect syncing, delete cloud products, fake balances or plant unsafe records", () => {
+  const doc = {
+    app: "mwakete-pos",
+    format: 1,
+    exportedAt: 1,
+    stores: {
+      settings: [
+        {
+          key: "apiUrl",
+          value: "https://script.google.com/macros/s/evil/exec",
+        },
+        { key: "productTombstones", value: [{ id: "p1", at: 1 }] },
+        { key: "balances", value: { c1: { amount: -1e6 } } },
+        { key: "businessName", value: "Shop\r\nBcc: x@y.com" },
+        { key: "currency", value: "AUD" },
+      ],
+      products: [
+        { id: 'x"><a href=//evil>', name: "Bad id", price: 1 },
+        { id: "good-1", name: "Good", price: 1 },
+      ],
+      customers: [{ id: "<img src=x>", name: "Bad customer" }],
+      sales: [
+        { id: "s1", createdAt: 1, total: 1, items: [], syncStatus: "synced" },
+        {
+          id: "s2",
+          createdAt: 1,
+          total: 1,
+          items: [],
+          syncStatus: "confirmed-by-server",
+        },
+        { id: "s3", createdAt: 1, total: 1, items: [], syncStatus: { a: 1 } },
+      ],
+    },
+  };
+  const r = B.parse(JSON.stringify(doc));
+  assert.equal(r.ok, true);
+  assert.deepEqual(
+    r.stores.settings.map((s) => s.key),
+    ["currency"],
+  );
+  assert.deepEqual(
+    r.stores.products.map((p) => p.id),
+    ["good-1"],
+  );
+  assert.deepEqual(r.stores.customers, []);
+  assert.deepEqual(
+    r.stores.sales.map((s) => s.id),
+    ["s1"],
+  );
+  assert.ok(r.skipped.some((s) => /unsafe characters/.test(s.reason)));
+  assert.ok(r.skipped.some((s) => /unknown sync state/.test(s.reason)));
+  assert.ok(r.skipped.some((s) => /unsafe value/.test(s.reason)));
+});
+
 test("files that are not a backup of this app are refused with a plain message", () => {
   assert.match(B.parse("").error, /empty/);
   assert.match(B.parse("{not json").error, /could not be read/);

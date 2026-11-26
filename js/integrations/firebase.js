@@ -149,10 +149,13 @@ const FirebaseBackend = (() => {
   //  - missing from the cloud but previously synced and unchanged here -> removed elsewhere, remove here
   function mergeProducts(local, cloud) {
     const upserts = [],
-      removes = [];
+      removes = [],
+      conflicts = [];
     const lById = new Map((local || []).map((p) => [p.id, p]));
     const cById = new Map((cloud || []).map((p) => [p.id, p]));
     for (const c of cloud || []) {
+      // A product id is used in page markup and as a key: anything but plain characters is ignored.
+      if (!c || !/^[A-Za-z0-9_-]{1,64}$/.test(String(c.id))) continue;
       const l = lById.get(c.id);
       if (!l) {
         upserts.push({
@@ -162,6 +165,8 @@ const FirebaseBackend = (() => {
           cloudSyncedAt: c.updatedAt,
         });
       } else if (c.updatedAt > (l.updatedAt || 0)) {
+        // A newer change from another device replaces an edit made here that never reached the cloud: tell the person.
+        if (isDirty(l)) conflicts.push({ id: l.id, name: l.name });
         const next = {
           ...l,
           updatedAt: c.updatedAt,
@@ -177,7 +182,7 @@ const FirebaseBackend = (() => {
     for (const l of local || [])
       if (!cById.has(l.id) && l.cloudSyncedAt && !isDirty(l))
         removes.push(l.id);
-    return { upserts, removes };
+    return { upserts, removes, conflicts };
   }
 
   /* Writes one batch and returns the per-record answer the synchroniser expects.
@@ -259,7 +264,8 @@ const FirebaseBackend = (() => {
           (id) => rejectedProducts.push({ id, ...denyReason }),
         );
       }
-      for (const id of payload.productDeletes || [])
+      // Only the owner can delete (the rules say so); others archive a product instead, so the marker is left alone.
+      for (const id of role === "owner" ? payload.productDeletes || [] : [])
         await run(
           () => fs.deleteDoc(fs.doc(dbRef, ...base, "products", id)),
           id,

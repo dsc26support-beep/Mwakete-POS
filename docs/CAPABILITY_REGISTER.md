@@ -85,7 +85,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-063 | Stock receiving | Verified | purchase orders |
 | POS-064 | Inventory audit trail | Verified | stock movements carry staff (cloud) and device code; every change is append-only (e2e/stocktake; rules tests) |
 | POS-065 | Inventory transaction integrity | Verified | movement saved before stock changes; history re-adds to explain every change (js/stock.js; e2e/stocktake) |
-| POS-066 | Stock availability validation | Partial | warns when a sale goes past this device's stock count; never blocks because counts can be stale |
+| POS-066 | Stock availability validation | Verified | a setting makes the till refuse a sale that needs more than the stock counted on this device (default: warn only); e2e/partials |
 
 ## E. Retail and wholesale pricing
 | ID | Capability | Status | Evidence / gap |
@@ -99,7 +99,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-073 | Percentage discounts | Verified | |
 | POS-074 | Fixed amount discounts | Verified | |
 | POS-075 | Discount authorization rules | Verified | discount above the shop's limit needs the manager PIN; owners and managers signed in are exempt; refused attempts are logged (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
-| POS-076 | Minimum wholesale quantity | Verified | product minimum quantity enforced on account / trade-customer sales (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
+| POS-076 | Minimum wholesale quantity | Verified | product minimum quantity enforced on account / trade-customer sales (e2e/controls) |
 | POS-077 | Pricing validation | Verified | price and cost validated; selling below cost asks first (e2e/partials) |
 | POS-078 | Price change history | Verified | last 20 price changes per product, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
 | POS-079 | Price rounding rules | Verified | optional cash rounding to 5 or 10 cents on the cash part only; the sale keeps its real total and records the rounding (e2e/partials; tests/checkout.test.js) |
@@ -185,8 +185,8 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-139 | Pending sync count | Verified | pending / refused counts under the sync status (js/pwa.js; e2e/pwa) |
 | POS-140 | Retry failed synchronization | Verified | backoff (unit + e2e) |
 | POS-141 | Prevent duplicate synchronization | Verified | |
-| POS-142 | Sync conflict handling | Partial | product edits: newest wins, no conflict state |
-| POS-143 | Sync recovery | Partial | |
+| POS-142 | Sync conflict handling | Verified | a newer change from another device that replaces an unsynced local product edit is reported in the sync history; ledger records cannot conflict (tests/firebase-roles.test.js; e2e/syncinfo) |
+| POS-143 | Sync recovery | Verified | sync history of the last 20 runs with reasons, automatic retry with backoff, refused records kept and retried (e2e/syncinfo; tests/syncbackoff.test.js) |
 | POS-144 | Sync error reporting | Verified | |
 | POS-145 | Protect unsynced transactions | Verified | |
 | POS-146 | Offline inventory handling | Partial | per-device stock; no central comparison |

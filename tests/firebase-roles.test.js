@@ -263,6 +263,63 @@ test("mergeProducts: a newer cloud product updates catalogue fields but keeps th
   );
 });
 
+test("mergeProducts ignores a cloud product whose id has unsafe characters", () => {
+  const r = mergeProducts(
+    [],
+    [prod('x"><b>', { updatedAt: 5 }), prod("good_1", { updatedAt: 5 })],
+  );
+  assert.deepEqual(
+    r.upserts.map((p) => p.id),
+    ["good_1"],
+  );
+});
+
+test("only the owner sends product deletions (the rules refuse everyone else)", async () => {
+  const mk = async (opts) => {
+    const f = fakeFs({
+      existing: { "businesses/OWNER1/products/gone": prod("gone") },
+    });
+    await syncWith(
+      f,
+      {},
+      "U1",
+      { productDeletes: ["gone"] },
+      { businessId: "OWNER1", ...opts },
+    );
+    return f.store.has("businesses/OWNER1/products/gone");
+  };
+  assert.equal(await mk({ role: "owner" }), false);
+  assert.equal(await mk({ role: "cashier", staffRole: "manager" }), true);
+  assert.equal(await mk({ role: "cashier", staffRole: "inventory" }), true);
+});
+
+test("mergeProducts reports a conflict only when an unsynced local edit is replaced by a newer cloud change", () => {
+  const dirty = prod("p1", {
+    name: "Mine",
+    updatedAt: 150,
+    cloudSyncedAt: 100,
+  });
+  const clean = prod("p2", {
+    name: "Clean",
+    updatedAt: 100,
+    cloudSyncedAt: 100,
+  });
+  const r = mergeProducts(
+    [dirty, clean],
+    [
+      prod("p1", { name: "Theirs", updatedAt: 200 }),
+      prod("p2", { name: "Theirs2", updatedAt: 200 }),
+    ],
+  );
+  assert.deepEqual(r.conflicts, [{ id: "p1", name: "Mine" }]);
+  assert.equal(r.upserts.length, 2);
+  // a local edit that is newer than the cloud copy is not a conflict (it will be pushed)
+  assert.deepEqual(
+    mergeProducts([dirty], [prod("p1", { updatedAt: 120 })]).conflicts,
+    [],
+  );
+});
+
 test("mergeProducts: a newer local edit is kept (it will be pushed); an older cloud copy is ignored", () => {
   const local = [prod("p1", { price: 9, updatedAt: 30, cloudSyncedAt: 10 })];
   const { upserts, removes } = mergeProducts(local, [

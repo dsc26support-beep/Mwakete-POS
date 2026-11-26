@@ -316,6 +316,49 @@ const eq = (a, b, m) => {
     await CheckoutUI.loadRounding();
   });
 
+  console.log(
+    "Optional: refuse a sale that needs more than the stock on this device",
+  );
+  await page.evaluate(async () => {
+    cart = [];
+    renderCart();
+    await POSDB.put("settings", { key: "stockGuard", value: "block" });
+    stockGuard = "block";
+  });
+  await page.click('[data-view="sale"]');
+  await page.click('[data-add="p2"]');
+  await page.evaluate(() => {
+    cart[0].qty = 9; // Rice has 5 on this device
+    renderCart();
+  });
+  const countBefore = (await page.evaluate(() => POSDB.all("sales"))).length;
+  await page.click("#checkout");
+  await settle(300);
+  ok(
+    /Only 5 of Rice in stock/.test(await page.innerText("#toast")),
+    "the sale is refused with the number in stock",
+  );
+  eq(
+    (await page.evaluate(() => POSDB.all("sales"))).length,
+    countBefore,
+    "nothing was saved",
+  );
+  await page.evaluate(() => {
+    cart[0].qty = 5;
+    renderCart();
+  });
+  await page.click("#checkout");
+  await settle(500);
+  eq(
+    (await page.evaluate(() => POSDB.all("sales"))).length,
+    countBefore + 1,
+    "a sale within the stock goes through",
+  );
+  await page.evaluate(async () => {
+    await POSDB.put("settings", { key: "stockGuard", value: "warn" });
+    stockGuard = "warn";
+  });
+
   eq(errors, [], "no page errors");
   await browser.close();
   server.close();

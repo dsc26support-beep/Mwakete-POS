@@ -43,6 +43,7 @@ const BackupCore = (() => {
     "deviceName",
     "deliveryQueue",
     "heldSales",
+    "syncLog",
     "creditSeq",
     "poSeq",
     "quoteSeq",
@@ -50,7 +51,17 @@ const BackupCore = (() => {
     "cartDraft",
     "registerOpen",
     "errorLog",
+    // Never restored from a file: they would silently redirect syncing, delete cloud products or fake balances.
+    "apiUrl",
+    "productTombstones",
+    "balances",
+    "lastBackupAt",
+    "setupDismissed",
   ]);
+  const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+  const STATUSES = ["pending", "synced", "rejected"];
+  const noControl = (s) =>
+    typeof s === "string" && !/[\u0000-\u001f\u007f]/.test(s);
   const isPlain = (o) =>
     o !== null && typeof o === "object" && !Array.isArray(o);
   const num = (v) => typeof v === "number" && Number.isFinite(v);
@@ -64,6 +75,15 @@ const BackupCore = (() => {
     if (Object.prototype.hasOwnProperty.call(r, "__proto__"))
       return "has a forbidden field";
     if (store === "settings" && SKIP_SETTINGS.has(key)) return "";
+    // Product and customer ids are drawn into pages and sent to the cloud: only plain characters.
+    if ((store === "products" || store === "customers") && !SAFE_ID.test(key))
+      return "has an id with unsafe characters";
+    // A record's sync state must be one the app knows, so a file cannot mark records as already confirmed by a server they never reached.
+    if (r.syncStatus !== undefined && !STATUSES.includes(r.syncStatus))
+      return "has an unknown sync state";
+    if (store === "settings" && (key === "businessName" || key === "currency"))
+      if (!noControl(r.value) || r.value.length > 100)
+        return "has an unsafe value";
     if (
       store === "products" &&
       (typeof r.name !== "string" ||

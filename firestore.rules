@@ -276,6 +276,7 @@ service cloud.firestore {
         && d.keys().hasOnly(['id', 'name', 'price', 'stock', 'sku', 'category', 'reorderLevel', 'prices', 'packs', 'taxExempt', 'description', 'unit', 'archived', 'priceHistory', 'minQty', 'qtyBreaks', 'barcode', 'updatedAt'])
         && d.id == productId
         && isShortString(d.id, 64)
+        && d.id.matches('^[A-Za-z0-9_-]+$')
         && isShortString(d.name, 100)
         && isMoney(d.price)
         && d.updatedAt is number
@@ -499,7 +500,10 @@ service cloud.firestore {
       match /products/{productId} {
         allow read: if isMember(businessId);
         allow create: if canManageCatalogue(businessId) && validProduct(productId);
-        allow update: if canManageCatalogue(businessId) && validProduct(productId);
+        // A stale device cannot roll a product back to an older version, and updatedAt cannot be pinned far in the future.
+        allow update: if canManageCatalogue(businessId) && validProduct(productId)
+          && request.resource.data.updatedAt >= resource.data.updatedAt
+          && request.resource.data.updatedAt <= request.time.toMillis() + 604800000;
         allow delete: if isOwner(businessId);
       }
 

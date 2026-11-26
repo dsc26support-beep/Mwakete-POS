@@ -210,6 +210,17 @@ test("products: description, unit, archived and price history are accepted; bad 
   await assertSucceeds(
     w("c7", { minQty: 12, qtyBreaks: [{ qty: 10, pct: 5 }] }),
   );
+  // ids are plain characters only (they are drawn into pages)
+  await assertFails(
+    setDoc(colDoc(OWNER, "products", 'bad"id'), { ...product('bad"id') }),
+  );
+  // a product cannot be rolled back to an older version or pinned far in the future
+  await assertSucceeds(w("roll", { updatedAt: 1700000000500 }));
+  await assertFails(w("roll", { updatedAt: 1700000000100 }));
+  await assertSucceeds(
+    w("roll", { updatedAt: 1700000000500, name: "Same time, new name" }),
+  );
+  await assertFails(w("roll", { updatedAt: 9999999999999 }));
   await assertSucceeds(w("c12", { barcode: "9310000000012" }));
   await assertFails(w("c13", { barcode: "x".repeat(81) }));
   await assertFails(w("c8", { minQty: 0 }));

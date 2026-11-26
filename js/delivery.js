@@ -95,7 +95,12 @@
           "mailto:" +
           encodeURIComponent(e.value) +
           "?subject=" +
-          encodeURIComponent(item.subject || "Your receipt") +
+          encodeURIComponent(
+            String(item.subject || "Your receipt").replace(
+              /[\u0000-\u001f\u007f]+/g,
+              " ",
+            ),
+          ) +
           "&body=" +
           encodeURIComponent(item.text),
       };
@@ -133,7 +138,11 @@
         channel: input.channel,
         to: String(input.to).trim(),
         countryCode: input.countryCode || "686",
-        subject: String(input.subject || "Your receipt").slice(0, 100),
+        // no line breaks or control characters in a mail subject (they could add mail headers in some mail apps)
+        subject: String(input.subject || "Your receipt")
+          .replace(/[\u0000-\u001f\u007f]+/g, " ")
+          .trim()
+          .slice(0, 100),
         text: String(input.text).slice(0, 2000),
         status: "Queued",
         attempts: 0,

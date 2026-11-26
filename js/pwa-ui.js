@@ -62,7 +62,66 @@ const PwaUI = (() => {
     return b;
   }
 
+  /* ---------- sync history (last 20 finished runs, kept on this device) ---------- */
+  let syncLog = [];
+  const MAX_LOG = 20;
+  const esc = (s) =>
+    String(s).replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    );
+  function renderSyncLog() {
+    const box = $("syncHistory");
+    if (!box) return;
+    box.innerHTML = syncLog.length
+      ? syncLog
+          .slice()
+          .reverse()
+          .map(
+            (e) =>
+              `<div class="resource-row"><div><strong>${esc(e.title)}</strong><small>${esc(new Date(e.at).toLocaleString())} · ${esc(e.detail)}</small></div></div>`,
+          )
+          .join("")
+      : '<p class="empty">No sync has finished on this device yet.</p>';
+  }
+  async function logSync(title, detail) {
+    const last = syncLog[syncLog.length - 1];
+    // the same message twice in a row (automatic retries) is shown once
+    if (
+      last &&
+      last.title === title &&
+      last.detail === String(detail).slice(0, 200) &&
+      Date.now() - last.at < 60000
+    )
+      return;
+    syncLog.push({
+      at: Date.now(),
+      title: String(title).slice(0, 40),
+      detail: String(detail).slice(0, 200),
+    });
+    if (syncLog.length > MAX_LOG) syncLog = syncLog.slice(-MAX_LOG);
+    try {
+      await POSDB.put("settings", { key: "syncLog", value: syncLog });
+    } catch {}
+    renderSyncLog();
+  }
+
   async function init() {
+    syncLog = (await POSDB.get("settings", "syncLog"))?.value || [];
+    renderSyncLog();
+    $("syncHistoryClear")?.addEventListener("click", async () => {
+      syncLog = [];
+      await POSDB.put("settings", { key: "syncLog", value: [] });
+      renderSyncLog();
+      toast("Sync history cleared.");
+    });
     renderInstall();
     renderBacklog();
     window.addEventListener("beforeinstallprompt", (e) => {
@@ -107,6 +166,7 @@ const PwaUI = (() => {
     init,
     render: () => (render(), Promise.resolve()),
     now: renderBacklog,
+    logSync,
   };
 })();
 if (typeof window !== "undefined") window.PwaUI = PwaUI;

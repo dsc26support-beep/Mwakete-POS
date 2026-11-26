@@ -383,10 +383,19 @@ const eq = (a, b, msg) => {
   await page.keyboard.press("Escape");
 
   console.log("Offline reload keeps everything");
-  await page.waitForTimeout(500);
+  // The offline reload needs the service worker to have finished caching the app.
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForTimeout(2500);
   await ctx.setOffline(true);
   await page.reload();
   await page.waitForSelector("#productGrid .product-card");
+  await page
+    .waitForFunction(
+      () => typeof TierUI !== "undefined" && !!TierUI.current(),
+      null,
+      { timeout: 10000 },
+    )
+    .catch(() => {});
   eq(
     await page.evaluate(() => TierUI.current()),
     "retail",

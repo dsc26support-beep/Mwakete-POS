@@ -25,6 +25,9 @@ async function refresh() {
   $("settingsForm").elements.currency.value = map.currency || "AUD";
   $("settingsForm").elements.apiUrl.value = map.apiUrl || "";
   $("settingsForm").elements.cashRounding.value = String(map.cashRounding || 0);
+  $("settingsForm").elements.stockGuard.value =
+    map.stockGuard === "block" ? "block" : "warn";
+  stockGuard = map.stockGuard === "block" ? "block" : "warn";
   if (window.RetailUI) await RetailUI.render();
   if (window.AnalyticsUI) await AnalyticsUI.render();
   if (window.SecurityUI) await SecurityUI.render();
@@ -38,6 +41,7 @@ const MAX_GRID = 150, // product cards drawn at the till
   MAX_ROWS = 200, // rows drawn in the product list
   MAX_SALES = 100; // sales drawn in the history
 const MAX_QTY = 9999; // most of one item in a single sale
+let stockGuard = "warn"; // "block" refuses a sale that needs more than the stock counted on this device
 /* Quantity discounts: the line keeps the price it started at (basePrice); the unit price follows the quantity. */
 function repriceLine(line) {
   const p = products.find((x) => x.id === (line.productId || line.id));
@@ -79,7 +83,7 @@ function renderProducts() {
     shown
       .map(
         (p) =>
-          `<button class="product-card" data-add="${p.id}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock > 0 ? p.stock + " in stock" : '<span class="badge out">Out of stock</span>'}</small></button>`,
+          `<button class="product-card" data-add="${esc(p.id)}"><strong>${esc(p.name)}</strong><span>${money(p.price)}</span><small>${p.stock > 0 ? esc(p.stock) + " in stock" : '<span class="badge out">Out of stock</span>'}</small></button>`,
       )
       .join("") +
     (items.length > shown.length
@@ -95,7 +99,7 @@ function renderCart() {
     ? cart
         .map(
           (x) =>
-            `<div class="cart-line"><div><strong>${esc(x.name)}</strong><small>${money(x.price)} × ${x.qty}${x.breakPct ? " (" + x.breakPct + "% quantity discount)" : ""}</small></div><div class="qty"><button data-dec="${x.id}" aria-label="Decrease">−</button><b>${money(x.price * x.qty)}</b><button data-inc="${x.id}" aria-label="Increase">+</button></div></div>`,
+            `<div class="cart-line"><div><strong>${esc(x.name)}</strong><small>${money(x.price)} × ${x.qty}${x.breakPct ? " (" + x.breakPct + "% quantity discount)" : ""}</small></div><div class="qty"><button data-dec="${esc(x.id)}" aria-label="Decrease">−</button><b>${money(x.price * x.qty)}</b><button data-inc="${esc(x.id)}" aria-label="Increase">+</button></div></div>`,
         )
         .join("")
     : '<p class="empty">Your cart is empty.</p>';
@@ -167,7 +171,7 @@ function renderProductTable() {
         .slice(0, MAX_ROWS)
         .map(
           (p) =>
-            `<tr><td>${esc(p.name)}</td><td>${esc(p.sku || "—")}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="text-button" data-delete="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></td></tr>`,
+            `<tr><td>${esc(p.name)}</td><td>${esc(p.sku || "—")}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="text-button" data-delete="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">Remove</button></td></tr>`,
         )
         .join(
           "",
@@ -313,10 +317,24 @@ $("productForm").addEventListener("submit", async (e) => {
   await refresh();
   toast("Product saved on this device.");
 });
-$("checkout").addEventListener("click", async () => {
+async function doCheckout() {
   if (!cart.length) return;
   if (typeof CloudUI !== "undefined" && !CloudUI.canSell())
     return toast("Your staff role cannot make sales.");
+  if (stockGuard === "block") {
+    for (const line of cart) {
+      const p = products.find((x) => x.id === (line.productId || line.id));
+      const need = line.qty * (line.packUnits || 1);
+      if (p && need > (Number(p.stock) || 0))
+        return toast(
+          "Only " +
+            (Number(p.stock) || 0) +
+            " of " +
+            p.name +
+            " in stock on this device. Change the quantity or count the stock.",
+        );
+    }
+  }
   const method = $("paymentMethod").value;
   if (
     !window.CheckoutUI &&
@@ -366,6 +384,18 @@ $("checkout").addEventListener("click", async () => {
   if (window.CheckoutUI) CheckoutUI.afterSale(sale);
   if (window.RetailUI) RetailUI.afterSale(sale);
   if (window.QuotesUI) await QuotesUI.afterSale(sale);
+}
+let checkingOut = false; // a second tap while a sale is being saved must not make a second sale
+$("checkout").addEventListener("click", async () => {
+  if (checkingOut) return;
+  checkingOut = true;
+  $("checkout").disabled = true;
+  try {
+    await doCheckout();
+  } finally {
+    checkingOut = false;
+    renderCart();
+  }
 });
 $("clearCart").addEventListener("click", () => {
   cart = [];
@@ -384,6 +414,9 @@ $("settingsForm").addEventListener("submit", async (e) => {
     key: "currency",
     value: String(f.get("currency")).trim().toUpperCase(),
   });
+  const guard = f.get("stockGuard") === "block" ? "block" : "warn";
+  await POSDB.put("settings", { key: "stockGuard", value: guard });
+  stockGuard = guard;
   const step = Number(f.get("cashRounding")) || 0;
   await POSDB.put("settings", {
     key: "cashRounding",
@@ -425,8 +458,9 @@ window.addEventListener("offline", connection);
 (async () => {
   await POSDB.open();
   $("year").textContent = new Date().getFullYear();
-  await refresh();
+  // The edition is read first, so the right screens show from the first moment (also after an offline reload).
   await TierUI.init();
+  await refresh();
   await RetailUI.init();
   await WholesaleUI.init();
   await InvoiceUI.init();

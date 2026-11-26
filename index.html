@@ -367,6 +367,12 @@
         <ul id="mwNeeds" class="hint"></ul>
         <div class="row-actions"><button id="mwConnect" class="button primary" type="button" disabled>Connect to Mwakete</button><button id="mwDisconnect" class="button secondary" type="button" disabled>Disconnect</button></div>
       </div>
+      <div class="panel setup-panel" id="syncPanel">
+        <p class="eyebrow">SYNC</p><h2>Sync history</h2>
+        <p class="hint">The last 20 finished sync runs on this device. A record the cloud refused stays on the device; fix it, then press <strong>Sync now</strong>. Failed runs retry by themselves.</p>
+        <div id="syncHistory" aria-live="polite"></div>
+        <div class="row-actions"><button id="syncHistoryClear" class="button secondary" type="button">Clear history</button></div>
+      </div>
       <div class="panel setup-panel" id="installPanel">
         <p class="eyebrow">INSTALL</p><h2>Use it like an app</h2>
         <p id="installText" class="muted"></p>
@@ -443,6 +449,7 @@
         <form id="settingsForm" class="settings-form">
           <label>Business name<input name="businessName" maxlength="100" placeholder="Your business name" required></label>
           <label>Currency code<input name="currency" maxlength="8" value="AUD" required></label>
+          <label>When a sale needs more than the stock on this device<select name="stockGuard"><option value="warn">Warn, but allow the sale</option><option value="block">Do not allow the sale</option></select></label>
           <label>Round cash payments to the nearest<select name="cashRounding"><option value="0">No rounding</option><option value="0.05">5 cents</option><option value="0.1">10 cents</option></select></label>
           <label>Google Apps Script Web App URL<input name="apiUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <button class="button primary" type="submit">Save settings</button>

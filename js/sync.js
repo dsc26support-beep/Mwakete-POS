@@ -274,10 +274,22 @@ async function applyCloud(result, sentProducts, sentDeletes) {
         (t) => t.id,
       ),
     );
-    const { upserts, removes } = FirebaseBackend.mergeProducts(
+    const { upserts, removes, conflicts } = FirebaseBackend.mergeProducts(
       await POSDB.all("products"),
       result.cloudProducts.filter((c) => !tomb.has(c.id)),
     );
+    // Conflict: an edit made here that never reached the cloud was replaced by a newer change from another device.
+    if (conflicts && conflicts.length && window.PwaUI)
+      PwaUI.logSync(
+        "Sync note: edit replaced",
+        conflicts.length +
+          " product edit(s) made here were replaced by a newer change from another device: " +
+          conflicts
+            .slice(0, 5)
+            .map((c) => c.name)
+            .join(", ") +
+          (conflicts.length > 5 ? "…" : ""),
+      );
     for (const p of upserts) {
       await POSDB.put("products", p);
       added++;
@@ -307,4 +319,7 @@ function setSyncUI(title, detail) {
     b = document.getElementById("syncDetail");
   if (a) a.textContent = title;
   if (b) b.textContent = detail;
+  // Finished runs (good or bad) are kept in a short history on the Setup screen.
+  if (/^Sync (complete|needs attention)/.test(title) && window.PwaUI)
+    PwaUI.logSync(title, detail);
 }
