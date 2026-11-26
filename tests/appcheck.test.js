@@ -32,6 +32,16 @@ test("App Check starts only when a site key is set, never on localhost, and a fa
   );
 });
 
+test("App Check is skipped when the reCAPTCHA script cannot be reached, so sign-in never depends on it", () => {
+  const src = read("js/integrations/firebase.js");
+  assert.match(src, /function recaptchaReachable/);
+  assert.ok(
+    src.indexOf("await recaptchaReachable()") <
+      src.indexOf("initializeAppCheck(app"),
+    "the reachability check comes before App Check starts",
+  );
+});
+
 test("the App Check SDK is not loaded in any other place (so nothing changes while the key is empty)", () => {
   const src = read("js/integrations/firebase.js");
   assert.equal(src.split("firebase-app-check.js").length - 1, 1);

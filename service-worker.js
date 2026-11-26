@@ -1,4 +1,4 @@
-const CACHE = "mwakete-pos-shell-v33";
+const CACHE = "mwakete-pos-shell-v34";
 const FILES = [
   "./",
   "./index.html",

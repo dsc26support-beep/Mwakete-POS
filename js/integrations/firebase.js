@@ -400,6 +400,24 @@ const FirebaseBackend = (() => {
   }
 
   /* ---------- SDK loading and auth ---------- */
+  /* App Check needs Google's reCAPTCHA script. If it cannot be reached (poor link, blocked), the Firebase SDK would make
+   * every sign-in fail with a network error, so App Check is skipped for that visit and sign-in keeps working. */
+  function recaptchaReachable(ms = 4000) {
+    return new Promise((resolve) => {
+      if (typeof document === "undefined") return resolve(false);
+      const s = document.createElement("script");
+      const done = (ok) => {
+        clearTimeout(t);
+        resolve(ok);
+      };
+      const t = setTimeout(() => done(false), ms);
+      s.onload = () => done(true);
+      s.onerror = () => done(false);
+      s.async = true;
+      s.src = "https://www.google.com/recaptcha/api.js";
+      document.head.appendChild(s);
+    });
+  }
   function load() {
     if (loading) return loading;
     loading = (async () => {
@@ -417,6 +435,7 @@ const FirebaseBackend = (() => {
         !(typeof location !== "undefined" && location.hostname === "localhost")
       ) {
         try {
+          if (!(await recaptchaReachable())) throw new Error("no reCAPTCHA");
           const ac = await import(CDN + "firebase-app-check.js");
           ac.initializeAppCheck(app, {
             provider: new ac.ReCaptchaV3Provider(FIREBASE_APPCHECK_SITE_KEY),
