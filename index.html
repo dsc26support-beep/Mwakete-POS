@@ -125,6 +125,7 @@
         </div>
         <p id="stockAlerts" class="hint" role="status"></p>
         <p id="stockValue" class="hint"></p>
+        <div class="row-actions"><button id="stockReportCsv" class="button secondary" type="button">Stock report (CSV)</button><button id="stockReportPrint" class="button secondary" type="button">Print stock report</button></div>
         <div class="bulk-bar" data-owner-only>
           <label class="check"><input id="prodSelectAll" type="checkbox"> Select all shown</label>
           <select id="bulkType" aria-label="Bulk change"><option value="percent">Change price by %</option><option value="category">Set category</option><option value="unit">Set unit</option><option value="archive">Archive</option><option value="restore">Restore</option></select>
@@ -227,6 +228,15 @@
           <button class="button primary" type="submit">Save stock change</button>
         </form>
       </div>
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">STOCK TAKE</p><h2>Count the whole shop</h2></div></div>
+        <p class="hint">Type what you really counted on the shelf for each product (leave blank to skip). Press <strong>Check differences</strong> to see what is short or over, then <strong>Apply counts</strong> to set the stock. Each change is saved as a "Stock count" movement.</p>
+        <input id="takeFilter" type="search" placeholder="Find a product" aria-label="Find a product to count">
+        <div id="takeTable" class="table-wrap"></div>
+        <p id="takeSummary" class="hint" role="status" aria-live="polite"></p>
+        <div class="row-actions"><button id="takeCheck" class="button secondary" type="button">Check differences</button><button id="takeApply" class="button primary" type="button">Apply counts</button><button id="takeCsv" class="button secondary" type="button">Differences (CSV)</button></div>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Everything that changed one product's stock</h2></div></div><p class="hint">Uses the product chosen in the form above: hand changes, sales and returns, newest first.</p><div id="productHistoryList"></div></div>
       <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Stock movements</h2></div></div><div id="stockMoves"></div></div>
     </section>
     <section id="view-purchasing" class="view hidden">
@@ -433,6 +443,7 @@
         <form id="settingsForm" class="settings-form">
           <label>Business name<input name="businessName" maxlength="100" placeholder="Your business name" required></label>
           <label>Currency code<input name="currency" maxlength="8" value="AUD" required></label>
+          <label>Round cash payments to the nearest<select name="cashRounding"><option value="0">No rounding</option><option value="0.05">5 cents</option><option value="0.1">10 cents</option></select></label>
           <label>Google Apps Script Web App URL<input name="apiUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <button class="button primary" type="submit">Save settings</button>
         </form>
@@ -550,6 +561,7 @@
         <label>Price<input name="price" type="number" min="0" step="0.01" required></label>
         <label>Cost price (stays on this device)<input name="costPrice" type="number" min="0" step="0.01" placeholder="Optional"></label>
         <label>Barcode / SKU<input name="sku" maxlength="80"></label>
+        <label>Second barcode (optional)<input name="barcode" maxlength="80"></label>
         <label>Category<input name="category" maxlength="40" list="categoryList"></label>
         <label>Reorder level<input name="reorderLevel" type="number" min="0" step="1" placeholder="Optional"></label>
         <label>Unit<select name="unit"></select></label>
@@ -618,7 +630,7 @@
     <div class="modal-card">
       <h3 id="txnTitle">Sale details</h3>
       <div id="txnBody"></div>
-      <div class="modal-actions"><button class="button secondary" type="button" id="txnSend">Send receipt…</button><button class="button primary" type="button" id="txnClose">Close</button></div>
+      <div class="modal-actions"><button class="button secondary hidden" type="button" id="txnCancelSale">Cancel this sale…</button><button class="button secondary hidden" type="button" id="txnCorrect">Correct this sale…</button><button class="button secondary" type="button" id="txnSend">Send receipt…</button><button class="button primary" type="button" id="txnClose">Close</button></div>
     </div>
   </div>
   <div id="deliveryPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deliveryTitle">

@@ -114,6 +114,7 @@ const FirebaseBackend = (() => {
         : undefined,
       unit: p.unit ? String(p.unit).slice(0, 12) : undefined,
       archived: p.archived === true ? true : undefined,
+      barcode: p.barcode ? String(p.barcode).slice(0, 80) : undefined,
       minQty: Number.isInteger(p.minQty) && p.minQty > 0 ? p.minQty : undefined,
       qtyBreaks: Array.isArray(p.qtyBreaks)
         ? p.qtyBreaks.slice(0, 5)
@@ -140,6 +141,7 @@ const FirebaseBackend = (() => {
     "priceHistory",
     "minQty",
     "qtyBreaks",
+    "barcode",
   ];
   // Decide what to change on this device after pulling the cloud catalogue.
   //  - new in the cloud -> add locally (stock is seeded from the cloud once)

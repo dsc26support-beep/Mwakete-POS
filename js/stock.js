@@ -104,6 +104,160 @@ const StockCore = (() => {
       .sort((a, b) => b.createdAt - a.createdAt);
   const deltaText = (d) => (d > 0 ? "+" : "") + d;
 
+  /* Everything that changed one product's stock, newest first: hand changes, sales, and returns put back on the shelf.
+   * `returns` = [{id, productId, units, at, number}] (the screen builds it from the credit notes that restocked). */
+  function history(productId, moves, sales, returns) {
+    const ev = [];
+    for (const m of moves || [])
+      if (m.productId === productId)
+        ev.push({
+          at: m.createdAt,
+          delta: m.delta,
+          kind: m.reason,
+          text: REASONS[m.reason] || m.reason,
+          note: m.note || "",
+          ref: m.id,
+          device: m.deviceId || "",
+        });
+    for (const s of sales || []) {
+      if (s.syncStatus === "rejected") continue;
+      let units = 0;
+      for (const it of s.items || [])
+        if (it.productId === productId)
+          units += (Number(it.quantity) || 0) * (Number(it.packUnits) || 1);
+      if (units)
+        ev.push({
+          at: s.createdAt,
+          delta: -units,
+          kind: "sale",
+          text: "Sold",
+          note: s.receiptNo || "",
+          ref: s.id,
+          device: s.deviceId || "",
+        });
+    }
+    for (const r of returns || [])
+      if (r.productId === productId && r.units)
+        ev.push({
+          at: r.at,
+          delta: r.units,
+          kind: "return",
+          text: "Returned to shelf",
+          note: r.number || "",
+          ref: r.id,
+          device: "",
+        });
+    return ev.sort((a, b) => b.at - a.at);
+  }
+
+  /* Stock take: counts = {productId: number|""}. Returns the rows that were counted with their difference. */
+  function stockTake(products, counts) {
+    const rows = [];
+    let shortUnits = 0,
+      overUnits = 0,
+      valueMinor = 0;
+    for (const p of products || []) {
+      if (p.archived) continue;
+      const raw = counts ? counts[p.id] : undefined;
+      if (raw === undefined || raw === "" || raw === null) continue;
+      const q = wholeQty(raw);
+      const expected = Math.max(0, Math.round(Number(p.stock) || 0));
+      if (q === null) {
+        rows.push({
+          productId: p.id,
+          name: p.name,
+          expected,
+          counted: null,
+          variance: 0,
+          error: "Enter a whole number",
+        });
+        continue;
+      }
+      const variance = q - expected;
+      if (variance < 0) shortUnits += -variance;
+      if (variance > 0) overUnits += variance;
+      const cost =
+        p.costPrice !== undefined && p.costPrice !== null
+          ? toMinor(p.costPrice)
+          : null;
+      if (cost !== null) valueMinor += variance * cost;
+      rows.push({
+        productId: p.id,
+        name: p.name,
+        expected,
+        counted: q,
+        variance,
+        valueAtCost: cost === null ? null : fromMinor(variance * cost),
+      });
+    }
+    return {
+      rows,
+      shortUnits,
+      overUnits,
+      varianceValueAtCost: fromMinor(valueMinor),
+      errors: rows.filter((r) => r.error).length,
+    };
+  }
+
+  /* The count movements that apply a stock take (only products whose count differs). */
+  function stockTakeMoves(products, counts, opts = {}) {
+    const take = stockTake(products, counts);
+    if (take.errors)
+      return { ok: false, error: "Fix the counts marked with an error first." };
+    const byId = new Map((products || []).map((p) => [p.id, p]));
+    const moves = [];
+    let n = 0;
+    for (const r of take.rows) {
+      if (!r.variance) continue;
+      const m = buildMove(byId.get(r.productId), "count", r.counted, {
+        id: opts.idFor ? opts.idFor(n++) : undefined,
+        now: opts.now,
+        note: opts.note || "Stock take",
+      });
+      if (!m.ok) return { ok: false, error: r.name + ": " + m.error };
+      if (opts.deviceId) m.value.deviceId = String(opts.deviceId).slice(0, 12);
+      moves.push({ move: m.value, newStock: m.newStock });
+    }
+    return { ok: true, moves, take };
+  }
+
+  function stockTakeCsv(take) {
+    const cell = (v) => {
+      const s = String(v == null ? "" : v);
+      // a plain (even negative) number is never a formula; any other text starting = + - @ is neutralised
+      const numeric = /^-?\d+(\.\d+)?$/.test(s);
+      const safe = !numeric && /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+      return /[",\r\n]/.test(safe)
+        ? '"' + safe.replace(/"/g, '""') + '"'
+        : safe;
+    };
+    const lines = ["product,expected,counted,difference,difference at cost"];
+    for (const r of take.rows)
+      lines.push(
+        [
+          r.name,
+          r.expected,
+          r.counted ?? "",
+          r.variance,
+          r.valueAtCost == null ? "" : r.valueAtCost.toFixed(2),
+        ]
+          .map(cell)
+          .join(","),
+      );
+    lines.push(
+      [
+        "TOTAL",
+        "",
+        "",
+        "short " + take.shortUnits + " / over " + take.overUnits,
+        take.varianceValueAtCost.toFixed(2),
+      ]
+        .map(cell)
+        .join(","),
+    );
+    return lines.join("\r\n") + "\r\n";
+  }
+
   /* ---------- numbers (PO-<device code>-<seq>) ---------- */
   const CODE_RE = /^[A-Z0-9]{3,8}$/;
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -337,6 +491,10 @@ const StockCore = (() => {
     ACTIONS,
     buildMove,
     movesFor,
+    history,
+    stockTake,
+    stockTakeMoves,
+    stockTakeCsv,
     deltaText,
     nextNumber,
     isValidPoNumber,

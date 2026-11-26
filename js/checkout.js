@@ -39,7 +39,19 @@
 
   /* lines: [{method, amount?, reference?, tendered?}] (amount optional on one "remainder" line).
    * Returns {ok, paymentMethod, payments, paymentVerified, tendered?, change?} or {ok:false,error}. */
-  function build(total, lines) {
+  /* Cash rounding step in cents: 0 (none), 5 or 10. Rounds half up to the nearest step. */
+  const STEPS = [0, 0.05, 0.1];
+  function roundCashMinor(minor, stepInput) {
+    const step = Math.round(Number(stepInput || 0) * 100);
+    if (!(step > 0) || !STEPS.includes(step / 100)) return minor;
+    return Math.round(minor / step) * step;
+  }
+  function roundCash(total, step) {
+    return fromMinor(roundCashMinor(toMinor(total), step));
+  }
+
+  function build(total, lines, opts = {}) {
+    let rounding; // signed amount added to the cash due by rounding
     const T = toMinor(total);
     if (!Number.isFinite(T) || T < 0) return fail("Total is not valid.");
     if (!Array.isArray(lines) || !lines.length)
@@ -94,22 +106,31 @@
     }
     if (cashLine) {
       if (due > 0 || (T === 0 && !payments.length)) {
+        // Cash rounding (for example to the nearest 5 cents): only the cash part is rounded, the sale total never changes.
+        const rounded = roundCashMinor(due, opts.rounding);
         const g =
           cashLine.tendered === undefined ||
           cashLine.tendered === null ||
           cashLine.tendered === ""
-            ? due
+            ? rounded
             : toMinor(cashLine.tendered);
-        if (!Number.isFinite(g) || g < due) {
+        if (!Number.isFinite(g) || g < rounded) {
           return {
             ok: false,
             error: "Cash received is less than the amount due in cash.",
-            short: Number.isFinite(g) ? fromMinor(due - g) : fromMinor(due),
+            short: Number.isFinite(g)
+              ? fromMinor(rounded - g)
+              : fromMinor(rounded),
           };
         }
-        payments.push({ method: "cash", amount: fromMinor(due), l: cashLine });
+        payments.push({
+          method: "cash",
+          amount: fromMinor(rounded),
+          l: cashLine,
+        });
         tendered = fromMinor(g);
-        change = fromMinor(g - due);
+        change = fromMinor(g - rounded);
+        if (rounded !== due) rounding = fromMinor(rounded - due);
         due = 0;
       } else {
         return fail("Cash is not needed: the other payments cover the total.");
@@ -133,6 +154,7 @@
       res.tendered = tendered;
       res.change = change;
     }
+    if (rounding !== undefined) res.rounding = rounding;
     return res;
   }
 
@@ -257,6 +279,8 @@
     METHODS,
     MAX_HELD,
     changeDue,
+    roundCash,
+    STEPS,
     build,
     cashPortion,
     methodTotals,

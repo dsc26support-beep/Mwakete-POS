@@ -185,7 +185,8 @@
       issues.push("The invoice total does not match the sale total.");
     if (Array.isArray(sale.payments) && sale.payments.length) {
       const paid = sale.payments.reduce((n, p) => n + toMinor(p.amount), 0);
-      if (paid !== total)
+      // cash rounding may move the cash part by a few cents; the sale records how much
+      if (paid !== total + toMinor(sale.rounding || 0))
         issues.push("The payments do not add up to the total.");
     }
     if (total < 0) issues.push("The total is negative.");
@@ -230,6 +231,32 @@
     return ev.sort((a, b) => a.at - b.at);
   }
 
+  /* A customer's purchases: count, total spent, refunds, most recent sales (newest first). */
+  function customerHistory(sales, refunds, customerId, limit = 10) {
+    const mine = (sales || []).filter(
+      (s) => s.customerId === customerId && s.syncStatus !== "rejected",
+    );
+    const ids = new Set(mine.map((s) => s.id));
+    let back = 0;
+    for (const r of refunds || [])
+      if (ids.has(r.saleId)) back += toMinor(r.total);
+    let total = 0;
+    for (const s of mine) total += toMinor(s.total);
+    const last = mine
+      .slice()
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+    return {
+      count: mine.length,
+      total: fromMinor(total),
+      refunded: fromMinor(back),
+      net: fromMinor(total - back),
+      firstAt: mine.length ? Math.min(...mine.map((s) => s.createdAt)) : null,
+      lastAt: last.length ? last[0].createdAt : null,
+      last,
+    };
+  }
+
   function summary(sales, refunds) {
     let n = 0,
       gross = 0;
@@ -248,6 +275,7 @@
     checkIntegrity,
     timeline,
     summary,
+    customerHistory,
     label,
     paymentText,
   };

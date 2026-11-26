@@ -24,6 +24,7 @@ async function refresh() {
   $("settingsForm").elements.businessName.value = map.businessName || "";
   $("settingsForm").elements.currency.value = map.currency || "AUD";
   $("settingsForm").elements.apiUrl.value = map.apiUrl || "";
+  $("settingsForm").elements.cashRounding.value = String(map.cashRounding || 0);
   if (window.RetailUI) await RetailUI.render();
   if (window.AnalyticsUI) await AnalyticsUI.render();
   if (window.SecurityUI) await SecurityUI.render();
@@ -60,7 +61,15 @@ function renderProducts() {
     items = products.filter(
       (p) =>
         !p.archived &&
-        (p.name + " " + (p.sku || "") + " " + (p.description || ""))
+        (
+          p.name +
+          " " +
+          (p.sku || "") +
+          " " +
+          (p.barcode || "") +
+          " " +
+          (p.description || "")
+        )
           .toLowerCase()
           .includes(q),
     );
@@ -375,6 +384,12 @@ $("settingsForm").addEventListener("submit", async (e) => {
     key: "currency",
     value: String(f.get("currency")).trim().toUpperCase(),
   });
+  const step = Number(f.get("cashRounding")) || 0;
+  await POSDB.put("settings", {
+    key: "cashRounding",
+    value: [0, 0.05, 0.1].includes(step) ? step : 0,
+  });
+  if (window.CheckoutUI) await CheckoutUI.loadRounding();
   const url = String(f.get("apiUrl") || "").trim();
   if (url)
     try {

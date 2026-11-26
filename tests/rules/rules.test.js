@@ -210,6 +210,8 @@ test("products: description, unit, archived and price history are accepted; bad 
   await assertSucceeds(
     w("c7", { minQty: 12, qtyBreaks: [{ qty: 10, pct: 5 }] }),
   );
+  await assertSucceeds(w("c12", { barcode: "9310000000012" }));
+  await assertFails(w("c13", { barcode: "x".repeat(81) }));
   await assertFails(w("c8", { minQty: 0 }));
   await assertFails(w("c9", { minQty: 2.5 }));
   await assertFails(w("c10", { qtyBreaks: "10:5" }));
@@ -1082,6 +1084,10 @@ test("stockMoves: append-only audit trail with a sensible delta and a known reas
   await assertSucceeds(w(OWNER, "m1", move("m1")));
   await assertSucceeds(w(OWNER, "m1", move("m1")));
   await assertFails(w(OWNER, "m1", move("m1", OWNER, { delta: 25 })));
+  await assertSucceeds(w(OWNER, "m9", move("m9", OWNER, { deviceId: "AB12" })));
+  await assertFails(
+    w(OWNER, "m10", move("m10", OWNER, { deviceId: "x".repeat(13) })),
+  );
   await assertFails(deleteDoc(colDoc(OWNER, "stockMoves", "m1")));
   await assertSucceeds(
     w(OWNER, "m2", move("m2", OWNER, { delta: -3, reason: "damage" })),

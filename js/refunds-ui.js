@@ -133,6 +133,9 @@ const RefundsUI = (() => {
       if (typeof refresh === "function") await refresh();
       if (window.InvoiceUI) await InvoiceUI.render();
       toast("Refund recorded as credit note " + number + ".");
+      document.dispatchEvent(
+        new CustomEvent("pos:refund", { detail: { saleId: sale.id } }),
+      );
       await showNote(r.value);
       if (typeof POSSynchroniser !== "undefined" && navigator.onLine)
         POSSynchroniser.run().catch(() => {});

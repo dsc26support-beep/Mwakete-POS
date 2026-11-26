@@ -133,6 +133,23 @@ test("integrity check", () => {
   );
 });
 
+test("integrity check allows the recorded cash rounding and nothing more", () => {
+  const ok = sale({
+    total: 10.03,
+    subtotal: 10.03,
+    items: [{ unitPrice: 10.03, quantity: 1 }],
+    payments: [{ method: "cash", amount: 10.05 }],
+    rounding: 0.02,
+  });
+  assert.deepEqual(T.checkIntegrity(ok), []);
+  assert.equal(T.checkIntegrity({ ...ok, rounding: undefined }).length, 1);
+  assert.equal(
+    T.checkIntegrity({ ...ok, payments: [{ method: "cash", amount: 10.09 }] })
+      .length,
+    1,
+  );
+});
+
 test("timeline lists the sale and its credit notes in order", () => {
   const s = sale();
   const t = T.timeline(s, [
@@ -147,6 +164,43 @@ test("timeline lists the sale and its credit notes in order", () => {
   ]);
   assert.equal(t.length, 2);
   assert.ok(/Credit note CN-1 for 4.00 — wrong size/.test(t[1].text));
+});
+
+test("customer history: count, spend, refunds, newest first, rejected ignored", () => {
+  const a = sale({ id: "a", customerId: "c1", total: 10, createdAt: 100 });
+  const b = sale({ id: "b", customerId: "c1", total: 5, createdAt: 300 });
+  const c = sale({ id: "c", customerId: "c2", total: 99, createdAt: 200 });
+  const d = sale({
+    id: "d",
+    customerId: "c1",
+    total: 50,
+    createdAt: 400,
+    syncStatus: "rejected",
+  });
+  const h = T.customerHistory(
+    [a, b, c, d],
+    [
+      { saleId: "a", total: 4 },
+      { saleId: "c", total: 9 },
+    ],
+    "c1",
+  );
+  assert.equal(h.count, 2);
+  assert.equal(h.total, 15);
+  assert.equal(h.refunded, 4);
+  assert.equal(h.net, 11);
+  assert.deepEqual(
+    h.last.map((s) => s.id),
+    ["b", "a"],
+  );
+  assert.equal(h.firstAt, 100);
+  assert.equal(h.lastAt, 300);
+  const none = T.customerHistory([a], [], "zzz");
+  assert.deepEqual(
+    [none.count, none.total, none.lastAt, none.last.length],
+    [0, 0, null, 0],
+  );
+  assert.equal(T.customerHistory([a, b], [], "c1", 1).last.length, 1);
 });
 
 test("summary", () => {

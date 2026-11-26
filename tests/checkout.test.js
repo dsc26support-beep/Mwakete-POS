@@ -97,6 +97,62 @@ test("rejects: overpaying digital, duplicate method, unknown method, two blanks,
   assert.equal(C.build(10, [{ method: "eftpos", amount: 4 }]).ok, false);
 });
 
+test("cash rounding: only the cash part, to the nearest 5 or 10 cents, recorded as a signed amount", () => {
+  assert.equal(C.roundCash(10.02, 0.05), 10);
+  assert.equal(C.roundCash(10.03, 0.05), 10.05);
+  assert.equal(C.roundCash(10.05, 0.1), 10.1);
+  assert.equal(C.roundCash(10.04, 0.1), 10);
+  assert.equal(C.roundCash(10.03, 0), 10.03);
+  assert.equal(C.roundCash(10.03, 0.07), 10.03); // only the allowed steps
+  const a = C.build(10.03, [{ method: "cash", tendered: 20 }], {
+    rounding: 0.05,
+  });
+  assert.equal(a.ok, true);
+  assert.deepEqual(a.payments, [{ method: "cash", amount: 10.05 }]);
+  assert.equal(a.rounding, 0.02);
+  assert.equal(a.change, 9.95);
+  const b = C.build(10.02, [{ method: "cash" }], { rounding: 0.05 });
+  assert.equal(b.rounding, -0.02);
+  assert.deepEqual(b.payments, [{ method: "cash", amount: 10 }]);
+  // exact amounts and digital payments are not rounded
+  assert.equal(
+    C.build(10, [{ method: "cash" }], { rounding: 0.05 }).rounding,
+    undefined,
+  );
+  assert.equal(
+    C.build(10.03, [{ method: "mpaisa" }], { rounding: 0.05 }).rounding,
+    undefined,
+  );
+  // the cash part of a split sale is the only part rounded
+  const s = C.build(
+    30.03,
+    [
+      { method: "eftpos", amount: 10 },
+      { method: "cash", tendered: 25 },
+    ],
+    { rounding: 0.05 },
+  );
+  assert.deepEqual(
+    s.payments.map((p) => [p.method, p.amount]),
+    [
+      ["eftpos", 10],
+      ["cash", 20.05],
+    ],
+  );
+  assert.equal(s.rounding, 0.02);
+  // short cash is judged against the rounded amount
+  assert.equal(
+    C.build(10.03, [{ method: "cash", tendered: 10.04 }], { rounding: 0.05 })
+      .ok,
+    false,
+  );
+  assert.equal(
+    C.build(10.03, [{ method: "cash", tendered: 10.05 }], { rounding: 0.05 })
+      .ok,
+    true,
+  );
+});
+
 test("cashPortion supports old and split sales", () => {
   assert.equal(C.cashPortion({ paymentMethod: "cash", total: 9 }), 9);
   assert.equal(C.cashPortion({ paymentMethod: "other", total: 9 }), 0);

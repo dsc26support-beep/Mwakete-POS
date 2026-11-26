@@ -280,3 +280,118 @@ test("the purchase order text lists lines, total, supplier and status", () => {
   assert.match(t, /Note: Friday/);
   assert.ok(t.split("\n").every((l) => l.length <= 40));
 });
+
+test("history merges hand changes, sales and returns for one product, newest first", () => {
+  const moves = [
+    {
+      id: "m1",
+      productId: "a",
+      delta: 10,
+      reason: "purchase",
+      createdAt: 100,
+      deviceId: "AB12",
+    },
+    { id: "m2", productId: "b", delta: 5, reason: "purchase", createdAt: 150 },
+  ];
+  const sales = [
+    {
+      id: "s1",
+      createdAt: 200,
+      receiptNo: "R-1",
+      items: [
+        { productId: "a", quantity: 2 },
+        { productId: "a", quantity: 1, packUnits: 6 },
+      ],
+    },
+    {
+      id: "s2",
+      createdAt: 250,
+      syncStatus: "rejected",
+      items: [{ productId: "a", quantity: 9 }],
+    },
+    { id: "s3", createdAt: 260, items: [{ productId: "b", quantity: 1 }] },
+  ];
+  const returns = [
+    { id: "c1", productId: "a", units: 1, at: 300, number: "CN-1" },
+  ];
+  const h = S.history("a", moves, sales, returns);
+  assert.deepEqual(
+    h.map((e) => [e.kind, e.delta]),
+    [
+      ["return", 1],
+      ["sale", -8],
+      ["purchase", 10],
+    ],
+  );
+  assert.equal(h[1].note, "R-1");
+  assert.equal(h[2].device, "AB12");
+  assert.deepEqual(S.history("zzz", moves, sales, returns), []);
+});
+
+test("stock take: variances, totals, bad counts, blanks skipped, archived ignored", () => {
+  const products = [
+    { id: "a", name: "Tea", stock: 10, costPrice: 2 },
+    { id: "b", name: "Rice", stock: 5 },
+    { id: "c", name: "Salt", stock: 3 },
+    { id: "d", name: "Old", stock: 4, archived: true },
+  ];
+  const t = S.stockTake(products, { a: "8", b: "7", c: "", d: "1" });
+  assert.deepEqual(
+    t.rows.map((r) => [r.name, r.expected, r.counted, r.variance]),
+    [
+      ["Tea", 10, 8, -2],
+      ["Rice", 5, 7, 2],
+    ],
+  );
+  assert.equal(t.shortUnits, 2);
+  assert.equal(t.overUnits, 2);
+  assert.equal(t.varianceValueAtCost, -4);
+  assert.equal(t.rows[1].valueAtCost, null);
+  assert.equal(S.stockTake(products, { a: "x" }).errors, 1);
+  assert.equal(S.stockTakeMoves(products, { a: "-1" }).ok, false);
+});
+
+test("stock take moves: one count movement per changed product, none when equal, device stamped", () => {
+  const products = [
+    { id: "a", name: "Tea", stock: 10 },
+    { id: "b", name: "Rice", stock: 5 },
+  ];
+  const r = S.stockTakeMoves(
+    products,
+    { a: "8", b: "5" },
+    {
+      idFor: (i) => "id" + i,
+      now: 7,
+      note: "Stock take 1 Dec",
+      deviceId: "AB12",
+    },
+  );
+  assert.equal(r.ok, true);
+  assert.equal(r.moves.length, 1);
+  assert.deepEqual(
+    [
+      r.moves[0].move.id,
+      r.moves[0].move.delta,
+      r.moves[0].move.reason,
+      r.moves[0].move.note,
+      r.moves[0].move.deviceId,
+      r.moves[0].newStock,
+    ],
+    ["id0", -2, "count", "Stock take 1 Dec", "AB12", 8],
+  );
+  assert.equal(S.stockTakeMoves(products, {}).moves.length, 0);
+});
+
+test("stock take CSV neutralises formulas and totals the differences", () => {
+  const take = S.stockTake(
+    [{ id: "a", name: "=bad()", stock: 3, costPrice: 1 }],
+    { a: "1" },
+  );
+  const csv = S.stockTakeCsv(take).trim().split("\r\n");
+  assert.equal(
+    csv[0],
+    "product,expected,counted,difference,difference at cost",
+  );
+  assert.ok(csv[1].startsWith("'=bad(),3,1,-2,-2.00"));
+  assert.ok(csv[2].startsWith("TOTAL,,,short 2 / over 0,-2.00"));
+});

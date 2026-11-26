@@ -17,6 +17,7 @@ const CheckoutUI = (() => {
         })[c],
     );
   let held = [];
+  let rounding = 0; // cash rounding step from the settings: 0, 0.05 or 0.1
   let hooks = { getCart: () => [], setCart: () => {}, render: () => {} };
 
   // The visible total already includes any discount, so read it from the screen.
@@ -69,11 +70,19 @@ const CheckoutUI = (() => {
       return;
     }
     const t = $("cashTendered").value;
+    const due = C.roundCash(total, rounding);
     if (t === "") {
-      out.textContent = "Exact amount. No change due.";
+      out.textContent =
+        due !== total
+          ? "Cash due " +
+            fmt(due) +
+            " (rounded from " +
+            fmt(total) +
+            "). No change due."
+          : "Exact amount. No change due.";
       return;
     }
-    const r = C.changeDue(total, Number(t));
+    const r = C.changeDue(due, Number(t));
     out.textContent = r.ok
       ? "Change due: " + fmt(r.change)
       : r.short !== undefined
@@ -89,7 +98,7 @@ const CheckoutUI = (() => {
       toast(l.error);
       return false;
     }
-    const r = C.build(sale.total, l.lines);
+    const r = C.build(sale.total, l.lines, { rounding });
     if (!r.ok) {
       toast(r.error);
       return false;
@@ -109,6 +118,7 @@ const CheckoutUI = (() => {
       sale.tendered = r.tendered;
       sale.change = r.change;
     }
+    if (r.rounding !== undefined) sale.rounding = r.rounding;
     return true;
   }
   function afterSale(sale) {
@@ -212,6 +222,11 @@ const CheckoutUI = (() => {
     });
   }
   /* Offer only the payment methods this business accepts (set in the set-up card). Older installs offer all of them. */
+  async function loadRounding() {
+    const v = Number((await POSDB.get("settings", "cashRounding"))?.value) || 0;
+    rounding = C.STEPS.includes(v) ? v : 0;
+    updateChange();
+  }
   async function applyMethods() {
     const on = OnboardingCore.enabledMethods(
       (await POSDB.get("settings", "payMethods"))?.value,
@@ -233,6 +248,7 @@ const CheckoutUI = (() => {
   async function init(h) {
     hooks = { ...hooks, ...h };
     bind();
+    await loadRounding();
     await applyMethods();
     await loadHeld();
     updateChange();
@@ -241,6 +257,14 @@ const CheckoutUI = (() => {
     $("holdSale").disabled = !cart.length;
     updateChange();
   }
-  return { init, apply, afterSale, afterCart, updateChange, applyMethods };
+  return {
+    init,
+    apply,
+    afterSale,
+    afterCart,
+    updateChange,
+    applyMethods,
+    loadRounding,
+  };
 })();
 if (typeof window !== "undefined") window.CheckoutUI = CheckoutUI;

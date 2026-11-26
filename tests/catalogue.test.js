@@ -185,6 +185,34 @@ test("minimum trade quantity and quantity discounts are saved and cleared by edi
   assert.equal(K.applyEdit(P(), { qtyBreaks: "bad" }).ok, false);
 });
 
+test("stock report: one row per active product, values at price and at cost, formulas neutralised", () => {
+  const csv = K.stockReportCsv([
+    P({ id: "1", name: "Tea", stock: 10, price: 5, costPrice: 2 }),
+    P({ id: "2", name: "=bad()", stock: 4, price: 3 }),
+    P({ id: "3", name: "Old", stock: 9, price: 1, archived: true }),
+  ]);
+  const lines = csv.trim().split("\r\n");
+  assert.equal(lines.length, 4); // header + 2 products + total
+  assert.ok(lines[1].startsWith("'=bad(),"));
+  assert.ok(lines[2].includes(",10,Available,5.00,2.00,50.00,20.00"));
+  assert.ok(lines[1].includes(",4,Available,3.00,,12.00,"));
+  assert.ok(lines[3].startsWith("TOTAL,,,,14,,,,62.00,20.00"));
+});
+
+test("below-cost check", () => {
+  assert.equal(K.belowCost(4, 5), true);
+  assert.equal(K.belowCost(5, 5), false);
+  assert.equal(K.belowCost(4, undefined), false);
+  assert.equal(K.belowCost(4, ""), false);
+  assert.equal(K.belowCost(0, 0), false);
+});
+
+test("a second barcode is saved and searchable", () => {
+  const a = K.applyEdit(P(), { barcode: " 9310000000012 " }, { now: 3 });
+  assert.equal(a.product.barcode, "9310000000012");
+  assert.equal(K.filter([a.product], { q: "9310000000012" }).length, 1);
+});
+
 test("thumbnail sizing and image validation", () => {
   assert.deepEqual(K.thumbSize(400, 200), { w: 96, h: 48 });
   assert.deepEqual(K.thumbSize(50, 40), { w: 50, h: 40 });

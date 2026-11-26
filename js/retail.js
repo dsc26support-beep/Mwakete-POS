@@ -124,6 +124,10 @@ const RetailCore = (() => {
         (p) =>
           String(p.sku ?? "")
             .trim()
+            .toLowerCase() === c ||
+          // a second barcode (for example a supplier's code on the same item)
+          String(p.barcode ?? "")
+            .trim()
             .toLowerCase() === c,
       ) || null
     );
@@ -259,6 +263,13 @@ const RetailCore = (() => {
         );
         if (p.reference) lines.push("  ref " + p.reference);
       }
+      if (sale.rounding)
+        lines.push(
+          row(
+            "Cash rounding",
+            (sale.rounding > 0 ? "+" : "") + money(sale.rounding),
+          ),
+        );
       if (sale.tendered !== undefined) {
         lines.push(row("Cash received", money(sale.tendered)));
         lines.push(row("Change", money(sale.change || 0)));
@@ -348,7 +359,7 @@ const RetailCore = (() => {
   }
   // `extraHtml` is pre-escaped HTML from a trusted builder (e.g. the Wholesale trade badge).
   function customerRow(c, extraHtml = "") {
-    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${c.email ? `<small>${esc(c.email)}</small>` : ""}${c.category ? `<small>Group: ${esc(c.category)}</small>` : ""}${c.address ? `<small>${esc(c.address)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div>`;
+    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${c.email ? `<small>${esc(c.email)}</small>` : ""}${c.category ? `<small>Group: ${esc(c.category)}</small>` : ""}${c.address ? `<small>${esc(c.address)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><div class="row-actions"><button class="text-button" data-history="${esc(c.id)}" aria-label="Purchases by ${esc(c.name)}">Purchases</button><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div></div>`;
   }
   function table(head, rows) {
     return rows.length

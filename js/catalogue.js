@@ -40,6 +40,7 @@
     }
     if ("description" in input) out.description = text(input.description, 300);
     if ("sku" in input) out.sku = text(input.sku, 80);
+    if ("barcode" in input) out.barcode = text(input.barcode, 80);
     if ("category" in input) out.category = text(input.category, 40);
     if ("unit" in input) {
       const u = String(input.unit || "each");
@@ -221,6 +222,67 @@
     };
   }
 
+  /* Stock report as CSV: one row per active product with value at selling price and at cost (blank when no cost). */
+  const csvCell = (v) => {
+    const s = String(v == null ? "" : v);
+    const safe = /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+    return /[",\r\n]/.test(safe) ? '"' + safe.replace(/"/g, '""') + '"' : safe;
+  };
+  function stockReportCsv(products) {
+    const rows = [
+      "name,sku,category,unit,stock,status,price,cost,value at price,value at cost",
+    ];
+    const list = (products || [])
+      .filter((p) => !p.archived)
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    for (const p of list) {
+      const s = Math.max(0, Number(p.stock) || 0);
+      const hasCost = p.costPrice !== undefined && p.costPrice !== null;
+      rows.push(
+        [
+          p.name,
+          p.sku || "",
+          p.category || "",
+          p.unit || "each",
+          s,
+          AVAIL_LABEL[availability(p)],
+          Number(p.price).toFixed(2),
+          hasCost ? Number(p.costPrice).toFixed(2) : "",
+          fromMinor(toMinor(p.price) * s).toFixed(2),
+          hasCost ? fromMinor(toMinor(p.costPrice) * s).toFixed(2) : "",
+        ]
+          .map(csvCell)
+          .join(","),
+      );
+    }
+    const v = valuation(products);
+    rows.push(
+      [
+        "TOTAL",
+        "",
+        "",
+        "",
+        v.units,
+        "",
+        "",
+        "",
+        v.retailValue.toFixed(2),
+        v.costedProducts ? v.costValue.toFixed(2) : "",
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+    return rows.join("\r\n") + "\r\n";
+  }
+
+  /* True when a price would sell below the cost the owner entered. */
+  const belowCost = (price, cost) =>
+    cost !== undefined &&
+    cost !== null &&
+    cost !== "" &&
+    Number(cost) > 0 &&
+    toMinor(price) < toMinor(cost);
+
   function categories(products) {
     return [
       ...new Set(
@@ -251,6 +313,8 @@
           p.name +
           " " +
           (p.sku || "") +
+          " " +
+          (p.barcode || "") +
           " " +
           (p.description || "")
         ).toLowerCase();
@@ -325,6 +389,8 @@
     availability,
     valuation,
     categories,
+    stockReportCsv,
+    belowCost,
     filter,
     bulk,
     addHistory,

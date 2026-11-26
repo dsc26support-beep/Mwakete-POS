@@ -138,6 +138,7 @@ const CatalogueUI = (() => {
     f.unit.value = p.unit || "each";
     f.description.value = p.description || "";
     f.archived.checked = !!p.archived;
+    f.barcode.value = p.barcode || "";
     f.qtyBreaks.value = K.breaksText(p.qtyBreaks);
     f.minQty.value = p.minQty ?? "";
     f.clearImage.checked = false;
@@ -176,9 +177,22 @@ const CatalogueUI = (() => {
       archived: f.archived.checked,
       qtyBreaks: f.qtyBreaks.value,
       minQty: f.minQty.value,
+      barcode: f.barcode.value,
     };
     const r = K.applyEdit(editing, input);
     if (!r.ok) return toast(r.error);
+    // Selling below the cost the owner entered is allowed, but never by accident.
+    if (
+      K.belowCost(r.product.price, r.product.costPrice) &&
+      !confirm(
+        "The price " +
+          fmt(r.product.price) +
+          " is below the cost " +
+          fmt(r.product.costPrice) +
+          ". Save it anyway?",
+      )
+    )
+      return;
     const next = r.product;
     if (f.clearImage.checked) delete next.image;
     else if (f.imageFile.files && f.imageFile.files[0]) {
@@ -249,6 +263,31 @@ const CatalogueUI = (() => {
       $("productEditPanel").classList.add("hidden"),
     );
     $("bulkApply").addEventListener("click", applyBulk);
+    $("stockReportCsv").addEventListener("click", () => {
+      const url = URL.createObjectURL(
+        new Blob(["﻿" + K.stockReportCsv(all)], {
+          type: "text/csv;charset=utf-8",
+        }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        "stock-report-" + new Date().toISOString().slice(0, 10) + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    });
+    // Print only the product list and its totals.
+    $("stockReportPrint").addEventListener("click", () => {
+      document.body.classList.add("print-products");
+      const done = () => {
+        document.body.classList.remove("print-products");
+        window.removeEventListener("afterprint", done);
+      };
+      window.addEventListener("afterprint", done);
+      window.print();
+    });
     $("bulkType").addEventListener("change", () => {
       const t = $("bulkType").value;
       $("bulkValue").classList.toggle(
