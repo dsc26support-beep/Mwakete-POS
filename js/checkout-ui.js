@@ -194,11 +194,17 @@ const CheckoutUI = (() => {
     hooks.setCart(r.lines);
     hooks.render();
     $("heldPanel").classList.add("hidden");
-    toast(
-      r.dropped.length
-        ? "Sale resumed. Removed (no longer sold): " + r.dropped.join(", ")
-        : "Sale resumed.",
-    );
+    const notes = [];
+    if (r.dropped.length)
+      notes.push("Removed (no longer sold): " + r.dropped.join(", "));
+    if (r.repriced && r.repriced.length)
+      notes.push(
+        "New price: " +
+          r.repriced
+            .map((x) => x.name + " " + x.from + " → " + x.to)
+            .join(", "),
+      );
+    toast(notes.length ? "Sale resumed. " + notes.join(". ") : "Sale resumed.");
   }
 
   function bind() {

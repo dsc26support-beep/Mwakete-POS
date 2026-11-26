@@ -218,6 +218,13 @@ test("hold / resume", () => {
   const r = C.resumeLines(m.hold, [{ id: "a" }]);
   assert.equal(r.lines.length, 1);
   assert.deepEqual(r.dropped, ["Rice"]);
+  const rp = C.resumeLines(m.hold, [{ id: "a", price: 3 }]);
+  assert.equal(rp.lines[0].price, 3);
+  assert.deepEqual(rp.repriced, [{ name: "Tea", from: 2.5, to: 3 }]);
+  assert.equal(
+    C.resumeLines(m.hold, [{ id: "a", price: 2.5 }]).repriced.length,
+    0,
+  );
   let l = [];
   for (let i = 0; i < C.MAX_HELD; i++)
     l = C.addHold(l, { ...m.hold, id: "h" + i }).list;

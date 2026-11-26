@@ -264,15 +264,30 @@
     const byId = new Map((products || []).map((p) => [p.id, p]));
     const lines = [];
     const dropped = [];
+    const repriced = [];
     for (const l of hold?.items || []) {
       const p = byId.get(l.productId);
       if (!p) {
         dropped.push(l.name);
         continue;
       }
-      lines.push({ ...l });
+      const line = { ...l };
+      // Plain lines (no price list, pack or quantity-break price) follow the current shelf price,
+      // so a sale held at an old price is not completed at it by mistake.
+      if (
+        !line.listId &&
+        !line.packId &&
+        line.basePrice === undefined &&
+        Number.isFinite(p.price) &&
+        p.price >= 0 &&
+        p.price !== line.price
+      ) {
+        repriced.push({ name: line.name, from: line.price, to: p.price });
+        line.price = p.price;
+      }
+      lines.push(line);
     }
-    return { lines, dropped };
+    return { lines, dropped, repriced };
   }
 
   const api = {
