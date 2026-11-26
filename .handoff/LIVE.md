@@ -5,14 +5,15 @@ generated: 2026-11-26
 goal: Camera scan on all phones + receipt share (WhatsApp/email) + user recs 2-5 done autonomously. Free only, all tests green before each deploy.
 
 ## state
-- Branch claude/pensive-curie-l1iir1, HEAD ded0053 + handoff commit, pushed; draft PR #1.
+- Branch claude/pensive-curie-l1iir1 pushed; draft PR #1. Last code commit: held sale resumes at current shelf price (checkout.js resumeLines returns repriced; plain lines only).
 - Full regression green (unit 381, browser 25 suites, a11y 0, rules 50, cloud e2e).
-- Committed NOT deployed: bundled reader (vendor/), torch, PNG/PDF share, send-from-popup, partial-row closures, Mwakete create() draft (closed), TAX_NOTES (unverified), review fixes batch 1.
-- DEPLOY BLOCKED: firebase CLI creds expired. User must run `firebase login --reauth --no-localhost`. Live site = old code.
+- Committed NOT deployed: bundled reader (vendor/), torch, PNG/PDF share, send-from-popup, partial-row closures, Mwakete create() draft (closed), TAX_NOTES (unverified), review fixes batches 1-2.
+- DEPLOY BLOCKED: firebase CLI creds expired. User must say "ready"; then I run `firebase login --reauth --no-localhost`, user approves link and pastes code. Live site = old code.
+- User asked for list of things needing them; given (reauth, App Check decision, real-phone pilot, tax check, Mwakete API).
 
 ## next-steps  <!-- resume here -->
 1. After re-auth: deploy (npx -y firebase-tools@latest deploy --only firestore:rules,hosting --project mwakete-pos); csp-check.js live; scan-bundled.e2e.js with BASE_URL=https://mwakete-pos.web.app.
-2. Open review findings: PIN to change approval limits; restore staffRole/clear business data on reload; refund duplicate/cumulative guard; held-sale re-pricing (checkout.js resumeLines keeps old prices); customers updatedAt guard; backup restore force pending; stronger device code; PBKDF2 PIN; firebase.json ignore *.log/*.md; narrow CSP script-src; precache vendor/* in SW; SHA-256 in vendor/README; Code.gs auth.
+2. Open review findings: PIN to change approval limits; restore staffRole/clear business data on reload; refund duplicate/cumulative guard; customers updatedAt guard; backup restore force pending; stronger device code; PBKDF2 PIN; firebase.json ignore *.log/*.md; narrow CSP script-src; precache vendor/* in SW; SHA-256 in vendor/README; Code.gs auth.
 3. Rec 3 App Check: reCAPTCHA Enterprise key after re-auth, ReCaptchaEnterpriseProvider, enforce only after live test.
 4. Update README counts, CHANGELOG, TESTING, register, PR #1 body.
 
