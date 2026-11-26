@@ -68,6 +68,30 @@ test("camera support needs a detector, a camera and a secure page", () => {
     true,
   );
   assert.equal(S.cameraSupport({ mediaDevices: md, secure: true }).ok, false);
+  // No built-in reader but WebAssembly: the bundled reader is used (iPhone, Firefox...)
+  const b = S.cameraSupport({ wasm: true, mediaDevices: md, secure: true });
+  assert.equal(b.ok, true);
+  assert.equal(b.engine, "bundled");
+  assert.equal(
+    S.cameraSupport({
+      BarcodeDetector: det,
+      wasm: true,
+      mediaDevices: md,
+      secure: true,
+    }).engine,
+    "native",
+  );
+  assert.equal(S.cameraSupport({ wasm: true, secure: true }).ok, false); // no camera
+  assert.equal(
+    S.cameraSupport({ wasm: true, mediaDevices: md, secure: false }).ok,
+    false,
+  );
+  assert.equal(
+    S.cameraSupport({ mediaDevices: md, secure: true }).engine,
+    "none",
+  );
+  assert.match(S.VENDOR.script, /vendor\/barcode-detector\.iife\.js$/);
+  assert.match(S.VENDOR.wasm, /vendor\/zxing_reader\.wasm$/);
   assert.equal(
     S.cameraSupport({ BarcodeDetector: det, secure: true }).ok,
     false,

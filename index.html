@@ -87,6 +87,7 @@
             </div>
           </div>
           <button id="checkout" class="button primary full" disabled>Complete cash sale</button>
+          <button id="sendLast" class="button secondary full hidden" type="button">Send the last receipt (WhatsApp, email, SMS)…</button>
           <div class="inline">
             <button id="holdSale" class="button" type="button" disabled>Hold sale</button>
             <button id="resumeSale" class="button" type="button">Held sales (<span id="heldCount">0</span>)</button>
@@ -587,7 +588,8 @@
       <h3 id="scanTitle">Scan with the camera</h3>
       <video id="scanVideo" class="scan-video" playsinline muted aria-label="Camera view"></video>
       <p id="scanStatus" class="hint" role="status" aria-live="polite">Point the camera at a barcode.</p>
-      <div class="modal-actions"><button class="button primary" type="button" id="scanClose">Done</button></div>
+      <p class="hint">No luck? Close this and type the number in the search box.</p>
+      <div class="modal-actions"><button class="button secondary hidden" type="button" id="scanTorch" aria-pressed="false">Light</button><button class="button primary" type="button" id="scanClose">Done</button></div>
     </div>
   </div>
   <div id="approvePanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="approveTitle">
@@ -627,6 +629,10 @@
         <label>Send by<select name="channel" id="deliveryChannel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
         <label>To (phone with country code, or email)<input name="to" id="deliveryTo" required maxlength="120" autocomplete="off"></label>
         <label>Message<textarea name="text" id="deliveryText" rows="5" maxlength="2000"></textarea></label>
+        <div id="shareBox" class="retail-box hidden">
+          <p class="hint">Or attach the receipt as a file and pick WhatsApp, email or Messenger from your phone's share list:</p>
+          <div class="row-actions"><button class="button secondary" type="button" id="deliveryShareImg">Share as picture</button><button class="button secondary" type="button" id="deliverySharePdf">Share as PDF</button></div>
+        </div>
         <p id="deliveryError" class="low" role="alert"></p>
         <div class="modal-actions"><button class="button secondary" type="button" id="deliveryCancel">Cancel</button><button class="button secondary" type="button" id="deliveryQueue">Add to queue</button><button class="button primary" type="submit">Send now</button></div>
       </form>
@@ -642,7 +648,7 @@
   <div id="receiptPanel" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt">
     <div class="modal-card">
       <div id="receiptBody"></div>
-      <div class="modal-actions"><button id="receiptRefund" class="button secondary" type="button" data-feature="refunds" hidden>Refund…</button><button id="receiptDelivery" class="button secondary" type="button" data-feature="quotes" hidden>Delivery note</button><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
+      <div class="modal-actions"><button id="receiptRefund" class="button secondary" type="button" data-feature="refunds" hidden>Refund…</button><button id="receiptDelivery" class="button secondary" type="button" data-feature="quotes" hidden>Delivery note</button><button id="receiptSend" class="button secondary" type="button">Send / share…</button><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
     </div>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -657,6 +663,7 @@
   <script src="./js/catalogue.js"></script>
   <script src="./js/txn.js"></script>
   <script src="./js/delivery.js"></script>
+  <script src="./js/receiptshare.js"></script>
   <script src="./js/analytics.js"></script>
   <script src="./js/security.js"></script>
   <script src="./js/scan.js"></script>

@@ -45,14 +45,23 @@
   /* Which camera features this browser has. `env` is injected so this can be tested. */
   function cameraSupport(env) {
     const hasDetector = typeof env.BarcodeDetector === "function";
+    const hasWasm = !!env.wasm; // WebAssembly is available: the bundled reader can run
     const hasMedia = !!(env.mediaDevices && env.mediaDevices.getUserMedia);
+    // "native": the browser's own reader (fast). "bundled": the reader shipped in vendor/ (works on iPhone, Firefox...).
+    const engine = hasDetector ? "native" : hasWasm ? "bundled" : "none";
     return {
-      ok: hasDetector && hasMedia && !!env.secure,
+      ok: engine !== "none" && hasMedia && !!env.secure,
+      engine,
       hasDetector,
+      hasWasm,
       hasMedia,
       secure: !!env.secure,
     };
   }
+  const VENDOR = {
+    script: "./vendor/barcode-detector.iife.js",
+    wasm: "./vendor/zxing_reader.wasm",
+  };
   const FORMATS = [
     "ean_13",
     "ean_8",
@@ -77,6 +86,7 @@
     createBuffer,
     cameraSupport,
     newProductFromCode,
+    VENDOR,
     FORMATS,
     MAX_CODE,
   };

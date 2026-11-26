@@ -119,6 +119,11 @@ const CheckoutUI = (() => {
     $("splitRef").value = "";
     updateChange();
     if (sale && sale.change > 0) toast("Change due: " + fmt(sale.change));
+    // Lets other screens offer "send the receipt" for the sale that was just made.
+    if (sale)
+      document.dispatchEvent(
+        new CustomEvent("pos:sale", { detail: { id: sale.id } }),
+      );
   }
 
   /* ---------- hold / resume ---------- */

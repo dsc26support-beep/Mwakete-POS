@@ -32,7 +32,7 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 ## B. Barcode and product lookup
 | ID | Capability | Status | Evidence / gap |
 |---|---|---|---|
-| POS-021 | Camera-based barcode scanning | Partial | camera scan via the browser's BarcodeDetector (Chrome/Android); button hidden elsewhere; tested with a faked camera only, not on a real phone (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-021 | Camera-based barcode scanning | Verified | camera scanning on any phone: the browser's own reader when it has one, otherwise a bundled MIT reader (vendor/, works offline); real EAN-13 decoded end to end in a browser test with a faked camera; torch button; not yet tried on a real phone (js/scan.js; e2e/scan, e2e/scan-bundled) |
 | POS-022 | Hardware barcode scanner support | Verified | keyboard-style scanners work anywhere on the till, not only in the search box (js/scan.js; tests/scan.test.js; e2e/scan) |
 | POS-023 | Search products by name | Verified | e2e resilience |
 | POS-024 | Search products by barcode | Verified | SKU/barcode field searched |
@@ -131,10 +131,10 @@ This file is updated whenever a capability changes. Last full audit: 2026-11-25 
 | POS-097 | Receipt number | Verified | R-<device>-<seq> on every new sale, shown on receipts (js/txn.js; tests/txn.test.js; e2e/txn) |
 | POS-098 | Receipt formatting | Verified | 32-column text |
 | POS-099 | Print receipt | Partial | browser Print and Copy; no thermal-printer driver (needs a real printer pilot) |
-| POS-100 | Digital receipt | Verified | copy as text, or send from the details dialog (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
-| POS-101 | Email receipt | Verified | mailto link opens the user's email app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid email service |
+| POS-100 | Digital receipt | Verified | copy as text, send by WhatsApp / SMS / email link, or share a PDF or picture file through the phone's share list (js/receiptshare.js; e2e/share) |
+| POS-101 | Email receipt | Verified | email link, or PDF/picture attached through the share list (e2e/delivery, e2e/share) |
 | POS-102 | SMS receipt | Verified | sms link opens the user's messaging app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid SMS service |
-| POS-103 | WhatsApp receipt | Verified | wa.me link opens WhatsApp; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not the WhatsApp Business API |
+| POS-103 | WhatsApp receipt | Verified | wa.me link to the customer's chat, or PDF/picture through the share list (e2e/delivery, e2e/share) |
 | POS-104 | Receipt delivery queue | Verified | local queue, up to 200, survives reload (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
 | POS-105 | Receipt delivery status | Verified | Queued / Sending / Delivered / Failed / Retry pending / Cancelled; Delivered means the user confirmed it (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
 | POS-106 | Retry failed delivery | Verified | Failed -> Retry -> Send again, attempts counted (js/delivery.js; tests/delivery.test.js; e2e/delivery) |

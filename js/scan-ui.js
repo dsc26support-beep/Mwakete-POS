@@ -46,21 +46,89 @@ const ScanUI = (() => {
     v.srcObject = null;
     $("scanPanel").classList.add("hidden");
   }
-  async function startCamera() {
-    const sup = S.cameraSupport({
+  const support = () =>
+    S.cameraSupport({
       BarcodeDetector: window.BarcodeDetector,
+      wasm: typeof WebAssembly === "object" && !!WebAssembly.instantiate,
       mediaDevices: navigator.mediaDevices,
       secure: window.isSecureContext,
     });
+
+  /* The reader: the browser's own when it has one, otherwise the bundled one (loaded once, then cached for offline use). */
+  let bundledLoading = null;
+  function loadBundled() {
+    if (window.BarcodeDetectionAPI)
+      return Promise.resolve(window.BarcodeDetectionAPI);
+    if (bundledLoading) return bundledLoading;
+    bundledLoading = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = S.VENDOR.script;
+      s.onload = () => {
+        const api = window.BarcodeDetectionAPI;
+        if (!api) return reject(new Error("The barcode reader did not load."));
+        // Find the decoder file next to the app instead of on the internet.
+        api.setZXingModuleOverrides({
+          locateFile: (path, prefix) =>
+            path.endsWith(".wasm") ? S.VENDOR.wasm : prefix + path,
+        });
+        resolve(api);
+      };
+      s.onerror = () => {
+        bundledLoading = null; // allow a retry when the connection returns
+        reject(
+          new Error(
+            "The barcode reader could not be loaded. Connect once to download it.",
+          ),
+        );
+      };
+      document.head.appendChild(s);
+    });
+    return bundledLoading;
+  }
+  async function makeDetector(engine) {
+    const Ctor =
+      engine === "native"
+        ? window.BarcodeDetector
+        : (await loadBundled()).BarcodeDetector;
+    try {
+      return new Ctor({ formats: S.FORMATS });
+    } catch {
+      return new Ctor();
+    }
+  }
+  /* Torch (phone light) on or off, where the camera has one. */
+  function setupTorch() {
+    const track = stream && stream.getVideoTracks()[0];
+    const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+    const btn = $("scanTorch");
+    btn.classList.toggle("hidden", !caps.torch);
+    btn.setAttribute("aria-pressed", "false");
+    btn.onclick = async () => {
+      const on = btn.getAttribute("aria-pressed") !== "true";
+      try {
+        await track.applyConstraints({ advanced: [{ torch: on }] });
+        btn.setAttribute("aria-pressed", String(on));
+      } catch {
+        toast("This camera cannot turn the light on.");
+      }
+    };
+  }
+  async function startCamera() {
+    const sup = support();
     if (!sup.ok)
       return toast(
         "This browser cannot scan with the camera. Use a barcode scanner or type the code.",
       );
     let detector;
     try {
-      detector = new window.BarcodeDetector({ formats: S.FORMATS });
-    } catch {
-      detector = new window.BarcodeDetector();
+      toast(
+        sup.engine === "bundled"
+          ? "Starting the camera reader…"
+          : "Starting the camera…",
+      );
+      detector = await makeDetector(sup.engine);
+    } catch (e) {
+      return toast(e.message);
     }
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -75,6 +143,7 @@ const ScanUI = (() => {
     const v = $("scanVideo");
     v.srcObject = stream;
     await v.play().catch(() => {});
+    setupTorch();
     $("scanPanel").classList.remove("hidden");
     $("scanStatus").textContent = "Point the camera at a barcode.";
     $("scanClose").focus();
@@ -99,12 +168,14 @@ const ScanUI = (() => {
 
   async function init() {
     // The camera button only appears where the browser can really scan.
-    const sup = S.cameraSupport({
-      BarcodeDetector: window.BarcodeDetector,
-      mediaDevices: navigator.mediaDevices,
-      secure: window.isSecureContext,
-    });
+    const sup = support();
     const btn = $("scanCamera");
+    // Warm the cache for offline use: when the bundled reader will be needed, fetch it once while online and idle.
+    if (sup.ok && sup.engine === "bundled" && navigator.onLine)
+      setTimeout(() => {
+        fetch(S.VENDOR.script).catch(() => {});
+        fetch(S.VENDOR.wasm).catch(() => {});
+      }, 8000);
     // The edition decides whether the button shows (data-feature); a browser that cannot scan has no button at all.
     if (!sup.ok) btn.remove();
     btn.addEventListener("click", startCamera);

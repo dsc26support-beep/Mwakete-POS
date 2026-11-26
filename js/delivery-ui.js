@@ -75,6 +75,72 @@ const DeliveryUI = (() => {
       ? RetailCore.buildReceiptText(sale, business, null)
       : D.shortText(sale, business);
   }
+  /* ---------- share a receipt FILE through the phone's share sheet ---------- */
+  const RS = ReceiptShare;
+  let customer = null;
+  function receiptLines() {
+    return RetailCore.buildReceiptText(sale, business, customer).split("\n");
+  }
+  function drawPng() {
+    const L = RS.pictureLayout(receiptLines());
+    const c = document.createElement("canvas");
+    c.width = L.width;
+    c.height = L.height;
+    const g = c.getContext("2d");
+    g.fillStyle = "#ffffff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = "#111111";
+    g.font = "bold 18px ui-monospace, Menlo, Consolas, monospace";
+    g.textBaseline = "top";
+    L.rows.forEach((r, i) => g.fillText(r, L.pad, L.pad + i * L.lineH));
+    return new Promise((res) => c.toBlob(res, "image/png"));
+  }
+  async function makeFile(kind) {
+    if (kind === "pdf") {
+      const { bytes } = RS.buildPdf(receiptLines());
+      return new File([bytes], RS.fileName(sale, "pdf"), {
+        type: "application/pdf",
+      });
+    }
+    const blob = await drawPng();
+    return new File([blob], RS.fileName(sale, "png"), { type: "image/png" });
+  }
+  async function shareFile(kind) {
+    if (!sale || busy) return;
+    busy = true;
+    try {
+      const file = await makeFile(kind);
+      if (!RS.canShareFiles(navigator, [file])) {
+        $("deliveryError").textContent =
+          "This phone cannot attach a file here. Use the WhatsApp, SMS or Email buttons instead.";
+        return;
+      }
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Receipt " + (sale.receiptNo || ""),
+          text: D.shortText(sale, business),
+        });
+        if (window.Audit)
+          Audit.log(
+            "receipt-send",
+            "Shared receipt " +
+              (kind === "pdf" ? "PDF" : "picture") +
+              " for sale " +
+              sale.id.slice(0, 8),
+          );
+        $("deliveryPanel").classList.add("hidden");
+        toast("Receipt shared.");
+      } catch (e) {
+        if (e && e.name !== "AbortError")
+          $("deliveryError").textContent =
+            "Could not share: " + (e.message || e.name);
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
   async function open(saleId) {
     sale = (await POSDB.get("sales", saleId)) || null;
     if (!sale) return toast("That sale was not found.");
@@ -82,6 +148,15 @@ const DeliveryUI = (() => {
     const cust = sale.customerId
       ? await POSDB.get("customers", sale.customerId)
       : null;
+    customer = cust;
+    // The file buttons show only where this phone can really attach files to a share.
+    let canFiles = false;
+    try {
+      canFiles = RS.canShareFiles(navigator, [
+        new File([new Uint8Array(1)], "r.pdf", { type: "application/pdf" }),
+      ]);
+    } catch {}
+    $("shareBox").classList.toggle("hidden", !canFiles);
     dirty = false;
     $("deliveryError").textContent = "";
     $("deliveryChannel").value = cust?.phone
@@ -175,6 +250,22 @@ const DeliveryUI = (() => {
       create(true);
     });
     $("deliveryQueue").addEventListener("click", () => create(false));
+    $("deliveryShareImg").addEventListener("click", () => shareFile("png"));
+    $("deliverySharePdf").addEventListener("click", () => shareFile("pdf"));
+    // From the receipt pop-up
+    $("receiptSend").addEventListener("click", () => {
+      const id = $("receiptPanel").dataset.saleId;
+      if (!id) return;
+      $("receiptPanel").classList.add("hidden");
+      open(id);
+    });
+    // The sale that was just made (works in every edition, even without receipt pop-ups)
+    let lastId = "";
+    document.addEventListener("pos:sale", (e) => {
+      lastId = e.detail.id;
+      $("sendLast").classList.remove("hidden");
+    });
+    $("sendLast").addEventListener("click", () => lastId && open(lastId));
     $("deliveryCancel").addEventListener("click", () =>
       $("deliveryPanel").classList.add("hidden"),
     );
