@@ -14,5 +14,5 @@ const FIREBASE_CONFIG = {
 };
 /* OPTIONAL App Check. Paste the reCAPTCHA v3 SITE key (public) here to turn it on; leave empty to keep it off.
  * Never paste the secret key. Turn on enforcement in the Firebase console only after testing with this set. */
-const FIREBASE_APPCHECK_SITE_KEY = "";
+const FIREBASE_APPCHECK_SITE_KEY = "6LfSETMuAAAAAN0uw6uv-3lmlyty_80YMUDJEA7S";
 if (typeof module !== "undefined") module.exports = FIREBASE_CONFIG;

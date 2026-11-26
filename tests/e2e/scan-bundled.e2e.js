@@ -209,7 +209,7 @@ const BAR = ean13("931000000001");
     fetched.some((f) => f.startsWith("zxing_reader.wasm 200")),
     "the decoder came from this site, not the internet",
   );
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(600); // inside the 1.5 s duplicate window, so this cannot race it
   eq(
     await page.evaluate(() => cart[0].qty),
     1,

@@ -7,7 +7,11 @@ const read = (p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8");
 
 test("App Check is off by default and only a public site key can be set", () => {
   const cfg = read("js/integrations/firebase-config.js");
-  assert.match(cfg, /const FIREBASE_APPCHECK_SITE_KEY = "";/);
+  // empty (off) or a public reCAPTCHA site key, which always starts with 6L and is 40 characters long
+  assert.match(
+    cfg,
+    /const FIREBASE_APPCHECK_SITE_KEY = "(6L[A-Za-z0-9_-]{38})?";/,
+  );
   assert.ok(
     !/client_secret|private_key|BEGIN [A-Z ]*KEY/.test(cfg),
     "no secret in the config file",
