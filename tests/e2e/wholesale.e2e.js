@@ -510,10 +510,20 @@ const eq = (a, b, m) => {
   );
 
   console.log("Offline reload");
-  await page.waitForTimeout(500);
+  // The offline reload needs the service worker to have finished caching the app.
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForTimeout(2500);
   await ctx.setOffline(true);
   await page.reload();
   await page.waitForSelector("#productGrid .product-card");
+  // The cards are drawn before the edition has been read back, so wait for start-up to get that far.
+  await page
+    .waitForFunction(
+      () => typeof TierUI !== "undefined" && !!TierUI.current(),
+      null,
+      { timeout: 10000 },
+    )
+    .catch(() => {});
   eq(
     await page.evaluate(() => TierUI.current()),
     "wholesale",
@@ -531,7 +541,11 @@ const eq = (a, b, m) => {
   server.close();
   console.log("\n" + passed + " browser checks passed");
 })().catch(async (e) => {
-  console.error("\nFAILED:", e.message);
+  console.error(
+    "\nFAILED:",
+    e.message,
+    e.actual !== undefined ? "(got " + JSON.stringify(e.actual) + ")" : "",
+  );
   server.close();
   process.exit(1);
 });

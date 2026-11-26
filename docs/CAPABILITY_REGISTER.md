@@ -1,0 +1,255 @@
+# Capability register (POS-001 to POS-172, plus sections M and N)
+
+Source: "Mwakete POS — Master Capability & Development Reference" (37 pages). The PDF's own statuses are **not evidence**; every row below was checked against this repository's code and tests.
+
+Status key: **Verified** = implemented and covered by a test that was run. **Partial** = some of it exists (the note says what is missing). **Missing** = not implemented. **N/A-ext** = needs an external provider or information that is not available (stated).
+This file is updated whenever a capability changes. Last full audit: 2026-11-25 (Phase 0). Test evidence names refer to `tests/` (unit), `tests/e2e/` (browser), `tests/rules/` (Firestore rules, emulator), `tests/a11y/`.
+
+## A. Sales and checkout
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-001 | Create new sales transaction | Verified | e2e tiers, refunds, resilience |
+| POS-002 | Add products to cart | Verified | e2e tiers, resilience |
+| POS-003 | Remove products from cart | Verified | decrement to zero removes the line (e2e) |
+| POS-004 | Modify product quantity | Verified | +/− controls (e2e) |
+| POS-005 | Calculate totals automatically | Verified | unit retail/wholesale/invoices |
+| POS-006 | Calculate change due | Verified | CheckoutCore.changeDue + live change display (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-007 | Cancel transactions | Verified | a completed sale is cancelled with a full refund in one step from the sale details; never deleted (e2e/partials) |
+| POS-008 | Hold or suspend a sale | Verified | hold/resume stored on the device, survives reload (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-009 | Resume held sales | Verified | hold/resume stored on the device, survives reload (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-010 | Clear cart | Verified | e2e |
+| POS-011 | Prevent invalid quantities | Verified | quantity capped at 9999 per line (e2e catalogue) |
+| POS-012 | Handle checkout validation | Verified | cash short, split totals, minimum trade quantity, stock warning, approval limits and payment rules are all checked before a sale is saved (e2e checkout, controls) |
+| POS-013 | Display checkout totals clearly | Verified | e2e |
+| POS-014 | Checkout without customer account | Verified | e2e |
+| POS-015 | Complete checkout with customer selection | Verified | e2e wholesale/retail |
+| POS-016 | Record transaction timestamp | Verified | `createdAt` on every sale |
+| POS-017 | Generate unique transaction ID | Verified | UUID per sale |
+| POS-018 | Prevent duplicate transactions | Verified | idempotent ID, rules accept identical re-send only (rules tests) |
+| POS-019 | Save completed transactions locally | Verified | IndexedDB (resilience e2e) |
+| POS-020 | Confirm transaction completion | Verified | toast + receipt |
+
+## B. Barcode and product lookup
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-021 | Camera-based barcode scanning | Verified | camera scanning on any phone: the browser's own reader when it has one, otherwise a bundled MIT reader (vendor/, works offline); real EAN-13 decoded end to end in a browser test with a faked camera; torch button; not yet tried on a real phone (js/scan.js; e2e/scan, e2e/scan-bundled) |
+| POS-022 | Hardware barcode scanner support | Verified | keyboard-style scanners work anywhere on the till, not only in the search box (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-023 | Search products by name | Verified | e2e resilience |
+| POS-024 | Search products by barcode | Verified | SKU/barcode field searched |
+| POS-025 | Search by product SKU | Verified | same field |
+| POS-026 | Add scanned products to cart | Verified | scan adds to the cart; packs too (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-027 | Handle unknown barcodes | Verified | unknown barcode: told, and offered a new product (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-028 | Register new product from unknown barcode | Verified | new product form opens with the barcode filled in (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-029 | Scanner keyboard compatibility | Verified | burst timing separates scanners from typing; Counter edition unchanged (js/scan.js; tests/scan.test.js; e2e/scan) |
+| POS-030 | Product lookup during offline mode | Verified | local IndexedDB (resilience e2e) |
+
+## C. Product management
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-031 | Create products | Verified | e2e |
+| POS-032 | Edit products | Verified | edit dialog (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-033 | Delete or archive products | Verified | archive/restore keeps history; delete still available (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-034 | Product name | Verified | |
+| POS-035 | Product description | Verified | description, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-036 | Product SKU | Verified | one field serves SKU and barcode |
+| POS-037 | Product barcode | Verified | optional second barcode, searchable and scannable; syncs; rules limit it (e2e/partials) |
+| POS-038 | Product category | Verified | Retail+ |
+| POS-039 | Product image | Verified | small picture, stored on this device only (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-040 | Product cost price | Verified | cost price, stored on this device only so cashiers cannot see margins (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-041 | Product retail price | Verified | |
+| POS-042 | Product wholesale price | Verified | trade prices through price lists, quantity discounts and pack sizes (e2e wholesale, controls) |
+| POS-043 | Product quantity | Verified | |
+| POS-044 | Unit of measurement | Verified | unit list, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-045 | Availability status | Verified | available / low / out / archived status (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-046 | Product import | Verified | CSV (unit + e2e) |
+| POS-047 | Bulk product editing | Verified | bulk price %, category, unit, archive, restore (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-048 | Product export | Verified | CSV (unit + e2e) |
+
+## D. Inventory management
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-049 | View current stock | Verified | |
+| POS-050 | Reduce stock after sales | Verified | e2e |
+| POS-051 | Increase stock after receiving | Verified | stock + purchasing e2e |
+| POS-052 | Manual stock adjustments | Verified | stock e2e |
+| POS-053 | Record adjustment reason | Verified | |
+| POS-054 | Inventory movement history | Verified | per-product history merges hand changes, sales and restocked returns (js/stock.js; e2e/stocktake) |
+| POS-055 | Stock count | Verified | "count" action |
+| POS-056 | Stock reconciliation | Verified | stock take for the whole shop with differences, value at cost, CSV and applied as count movements (e2e/stocktake) |
+| POS-057 | Low-stock alerts | Verified | low-stock list (Retail) and alert line + badges on Products (e2e/catalogue) |
+| POS-058 | Out-of-stock alerts | Verified | out-of-stock alert line and badges (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-059 | Stock valuation | Verified | valuation at selling price and at cost; products without cost are called out (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-060 | Inventory search | Verified | search by name, barcode, description (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-061 | Inventory category filtering | Verified | category filter (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-062 | Inventory export | Verified | CSV export includes stock |
+| POS-063 | Stock receiving | Verified | purchase orders |
+| POS-064 | Inventory audit trail | Verified | stock movements carry staff (cloud) and device code; every change is append-only (e2e/stocktake; rules tests) |
+| POS-065 | Inventory transaction integrity | Verified | movement saved before stock changes; history re-adds to explain every change (js/stock.js; e2e/stocktake) |
+| POS-066 | Stock availability validation | Verified | a setting makes the till refuse a sale that needs more than the stock counted on this device (default: warn only); e2e/partials |
+
+## E. Retail and wholesale pricing
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-067 | Retail price | Verified | |
+| POS-068 | Wholesale price | Verified | price lists give a trade price per product (e2e wholesale) |
+| POS-069 | Customer-specific prices | Partial | per-customer price list; no per-product customer override |
+| POS-070 | Bulk pricing | Verified | pack sizes and up to 5 quantity discounts per product (e2e wholesale, controls) |
+| POS-071 | Quantity-based discounts | Verified | up to 5 quantity discounts per product (from N units, P% off); price follows the quantity, never compounds, survives hold/resume (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
+| POS-072 | Manual discounts | Verified | |
+| POS-073 | Percentage discounts | Verified | |
+| POS-074 | Fixed amount discounts | Verified | |
+| POS-075 | Discount authorization rules | Verified | discount above the shop's limit needs the manager PIN; owners and managers signed in are exempt; refused attempts are logged (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
+| POS-076 | Minimum wholesale quantity | Verified | product minimum quantity enforced on account / trade-customer sales (e2e/controls) |
+| POS-077 | Pricing validation | Verified | price and cost validated; selling below cost asks first (e2e/partials) |
+| POS-078 | Price change history | Verified | last 20 price changes per product, synced (js/catalogue.js; tests/catalogue.test.js; e2e/catalogue) |
+| POS-079 | Price rounding rules | Verified | optional cash rounding to 5 or 10 cents on the cash part only; the sale keeps its real total and records the rounding (e2e/partials; tests/checkout.test.js) |
+| POS-080 | Prevent unauthorized price overrides | Partial | no price editing at the till; discounts need approval above a limit; the server still cannot verify prices (needs Cloud Functions) |
+
+## F. Payments
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-081 | Cash payments | Verified | |
+| POS-082 | Bank EFTPOS/card recording | Verified | EFTPOS/card recorded, never verified (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-083 | Internet Banking recording | Verified | Internet banking recorded, never verified (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-084 | MPaisa recording | Verified | M-PAiSA recorded, never verified (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-085 | Split payments | Verified | up to 4 payment lines that must add up; rules validate (rules test) |
+| POS-086 | Partial payment recording | Verified | split payments plus account payments (e2e checkout, invoices) |
+| POS-087 | Payment validation | Verified | overpay, duplicates, unknown methods refused (unit) |
+| POS-088 | Payment method reporting | Verified | report by payment method on every period report, split sales spread across methods (e2e/analytics) |
+| POS-089 | Cash change calculation | Verified | CheckoutCore.changeDue + live change display (js/checkout.js; tests/checkout.test.js; e2e/checkout) |
+| POS-090 | Cash reconciliation | Verified | register e2e |
+| POS-091 | Cash drawer opening balance | Verified | |
+| POS-092 | Cash drawer closing balance | Verified | |
+| POS-093 | Cash discrepancy reporting | Verified | shift report |
+| POS-094 | Refund payment tracking | Verified | refund method |
+| POS-095 | Payment transaction integrity | Verified | record check re-adds lines, discount, payments and rounding on every sale (tests/txn.test.js) |
+
+## G. Receipts and customers
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-096 | Generate receipt | Verified | |
+| POS-097 | Receipt number | Verified | R-<device>-<seq> on every new sale, shown on receipts (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-098 | Receipt formatting | Verified | 32-column text |
+| POS-099 | Print receipt | Partial | 58 mm print layout, browser Print, copy, and file sharing; no direct thermal-printer driver (needs a real printer pilot) |
+| POS-100 | Digital receipt | Verified | copy as text, send by WhatsApp / SMS / email link, or share a PDF or picture file through the phone's share list (js/receiptshare.js; e2e/share) |
+| POS-101 | Email receipt | Verified | email link, or PDF/picture attached through the share list (e2e/delivery, e2e/share) |
+| POS-102 | SMS receipt | Verified | sms link opens the user's messaging app; user confirms (js/delivery.js; tests/delivery.test.js; e2e/delivery). Not automatic: no paid SMS service |
+| POS-103 | WhatsApp receipt | Verified | wa.me link to the customer's chat, or PDF/picture through the share list (e2e/delivery, e2e/share) |
+| POS-104 | Receipt delivery queue | Verified | local queue, up to 200, survives reload (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-105 | Receipt delivery status | Verified | Queued / Sending / Delivered / Failed / Retry pending / Cancelled; Delivered means the user confirmed it (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-106 | Retry failed delivery | Verified | Failed -> Retry -> Send again, attempts counted (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-107 | Customer database | Verified | local customer list with search at checkout |
+| POS-108 | Customer contact details | Verified | phone, email, address, customer group, note validated (js/delivery.js; tests/delivery.test.js; e2e/delivery) |
+| POS-109 | Customer purchase history | Verified | Purchases button on each customer: count, spend, refunds, latest sales (e2e/partials) |
+| POS-110 | Customer selection at checkout | Verified | |
+
+## H. Transaction management
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-111 | Transaction history | Verified | |
+| POS-112 | Transaction search | Verified | search by receipt, product, payment reference (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-113 | Transaction filtering | Verified | filters: dates, payment method, status (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-114 | View transaction details | Verified | details dialog (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-115 | Transaction status | Verified | Completed / Partly or Fully refunded / On account / Not accepted by the cloud (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-116 | Transaction export | Verified | CSV export of the filtered list, formulas neutralised (js/txn.js; tests/txn.test.js; e2e/txn) |
+| POS-117 | Transaction audit history | Partial | sale history is derived from records and credit notes; separate device activity log exists; no cloud audit trail |
+| POS-118 | Transaction cancellation controls | Verified | cancel = full refund with a reason in one step; sales are never edited (e2e/partials) |
+| POS-119 | Transaction correction workflow | Verified | Correct this sale: refund, then the original items return to the till to be fixed and re-rung (e2e/partials) |
+| POS-120 | Transaction integrity checks | Verified | TxnCore.checkIntegrity re-adds lines, discount and payments (js/txn.js; tests/txn.test.js; e2e/txn) |
+
+## I. Returns and refunds
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-121 | Return products | Verified | refunds e2e |
+| POS-122 | Full transaction return | Verified | |
+| POS-123 | Partial transaction return | Verified | |
+| POS-124 | Return reason | Verified | |
+| POS-125 | Return inventory handling | Verified | restock option |
+| POS-126 | Refund recording | Verified | |
+| POS-127 | Refund payment method tracking | Verified | |
+| POS-128 | Refund authorization | Verified | refund above the shop's limit needs the manager PIN; override logged (e2e/controls; tests/catalogue.test.js; tests/security.test.js) |
+| POS-129 | Return history | Verified | |
+| POS-130 | Return audit trail | Verified | credit notes are append-only, staff-stamped, in the sale timeline and the activity log (e2e/controls, txn) |
+
+## J. Offline operation and synchronization
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-131 | Offline application access | Verified | service worker (resilience e2e) |
+| POS-132 | Offline product access | Verified | |
+| POS-133 | Offline checkout | Verified | resilience e2e |
+| POS-134 | Offline transaction storage | Verified | |
+| POS-135 | Pending synchronization queue | Verified | |
+| POS-136 | Automatic synchronization | Verified | |
+| POS-137 | Manual synchronization | Verified | |
+| POS-138 | Sync status indicator | Verified | |
+| POS-139 | Pending sync count | Verified | pending / refused counts under the sync status (js/pwa.js; e2e/pwa) |
+| POS-140 | Retry failed synchronization | Verified | backoff (unit + e2e) |
+| POS-141 | Prevent duplicate synchronization | Verified | |
+| POS-142 | Sync conflict handling | Verified | a newer change from another device that replaces an unsynced local product edit is reported in the sync history; ledger records cannot conflict (tests/firebase-roles.test.js; e2e/syncinfo) |
+| POS-143 | Sync recovery | Verified | sync history of the last 20 runs with reasons, automatic retry with backoff, refused records kept and retried (e2e/syncinfo; tests/syncbackoff.test.js) |
+| POS-144 | Sync error reporting | Verified | |
+| POS-145 | Protect unsynced transactions | Verified | |
+| POS-146 | Offline inventory handling | Partial | per-device stock; no central comparison |
+
+## K. Security and staff management
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-147 | Firebase authentication | Verified | cloud e2e |
+| POS-148 | Secure registration | Verified | verified email |
+| POS-149 | Secure login | Verified | |
+| POS-150 | Logout | Verified | |
+| POS-151 | Business data isolation | Verified | rules tests |
+| POS-152 | Staff accounts | Verified | |
+| POS-153 | Role-based permissions | Verified | owner + cashier, manager, inventory, auditor; enforced by Firestore rules (rules tests 50/50) |
+| POS-154 | Cashier permissions | Verified | cashier sells and refunds, reads own records only (rules tests) |
+| POS-155 | Manager permissions | Verified | manager: sells, manages catalogue/customers/stock/orders, reads all (rules tests) |
+| POS-156 | Administrator permissions | Partial | the owner is the administrator; no separate second-administrator role |
+| POS-157 | Authorization validation | Verified | rules |
+| POS-158 | Security audit log | Partial | tamper-evident hash-chained activity log on each device, exportable (js/security.js; e2e/security). Not yet synced to the cloud |
+| POS-159 | Secure offline data handling | Partial | not encrypted at rest |
+| POS-160 | Session management | Verified | screen-lock PIN (salted, stretched), idle lock, lock-out after 5 wrong PINs (e2e/security). Protects against casual use only |
+| POS-161 | Data backup | Verified | backup e2e |
+| POS-162 | Recovery procedures | Partial | restore from file; no restore from cloud |
+
+## L. Reports and analytics
+| ID | Capability | Status | Evidence / gap |
+|---|---|---|---|
+| POS-163 | Daily sales report | Verified | Today / Yesterday presets (js/analytics.js; tests/analytics.test.js; e2e/analytics). Retail and Wholesale editions |
+| POS-164 | Weekly sales report | Verified | This week (Monday to today), Last week (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-165 | Monthly sales report | Verified | This month, Last month (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-166 | Custom date reports | Verified | custom dates, validated, at most one year (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-167 | Sales by product | Verified | by product with category/payment/staff/edition filters (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-168 | Sales by category | Verified | by category (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-169 | Sales by cashier | Verified | by staff on this device's records; whole business in the cloud report (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-170 | Sales by payment method | Verified | by payment method, split sales spread across methods (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+| POS-171 | Inventory report | Verified | stock report CSV and print with value at price and at cost; stock take differences CSV (e2e/partials, e2e/stocktake) |
+| POS-172 | Profit reporting | Partial | estimate from today's cost price for costed products only; assumptions printed on the report (js/analytics.js; tests/analytics.test.js; e2e/analytics) |
+
+## M. Device, installability and interface
+| Capability | Status | Evidence / gap |
+|---|---|---|
+| Responsive mobile / tablet / desktop | Partial | one responsive layout, axe-clean at all editions; no separate desktop sidebar layout |
+| Installable PWA, icon, manifest | Verified | PNG 192/512 + maskable icons, id/scope, install button (tests/pwa.test.js, e2e/pwa). Not yet tried on a real phone |
+| Offline shell, service worker lifecycle | Verified | every script and icon cached (unit test checks the list); offline reload (e2e/pwa, resilience) |
+| Local storage persistence | Verified | asks the browser for persistent storage; status shown in Setup (best effort; browsers may refuse) |
+| Device registration / identification | Verified | device code + name, shown in Setup, stamped on every sale as `deviceId` (e2e/security) |
+| Device management / removal | Partial | staff access is removed by deactivating the account; no cloud list of devices and no remote wipe (needs a server) |
+| Multiple devices per business, cross-device sync | Partial | cashiers and managers sync through the cloud account; stock is per device |
+| Network status monitoring | Verified | online/offline badge, sync backlog count (e2e/pwa) |
+| Application update handling | Verified | update banner; the page never reloads by itself (e2e/pwa) |
+| Data migration | Verified | IndexedDB upgrade tests (tiers, wholesale, invoices e2e) |
+| Device recovery | Partial | backup file restore; no cloud restore |
+| Accessibility, keyboard support | Verified | axe scan of every screen, edition and dialog; dialog focus trap (tests/a11y). Screen reader not tested |
+| Touch-friendly controls, adaptive navigation | Partial | tab bar and large buttons; the Micro (Counter) edition is the simplified workspace; no per-edition layouts |
+| First-run onboarding | Verified | set-up card: name, currency, edition, accepted payments, device name (e2e/onboarding) |
+
+## N. Optional Mwakete integration
+| Capability | Status | Evidence / gap |
+|---|---|---|
+| Independent POS operation without Mwakete | Verified | everything runs without it |
+| Status, authorization, disconnect screens | Verified | Setup -> Mwakete Marketplace link: "Not connected", reason, needs list (tests/mwakete.test.js) |
+| Connection, store linking, sync of products / inventory / transactions, error reporting against a live API | N/A-ext | the Mwakete API contract was not supplied; no API is invented. docs/MWAKETE_INTEGRATION.md lists what is needed |
+| Marketplace data kept apart from independent-business data | Verified (by design) | the adapter makes no network call and stores nothing (tested) |
+
+## Cross-cutting requirements (PDF sections 7–21)
+Tracked in `docs/CAPABILITY_REGISTER.md` updates below as they are verified: transaction and movement record fields (section 8), delivery states (10), customer privacy (11), report permission controls (13), security audit trail (14), onboarding (16), production acceptance criteria (20), documentation set (22).

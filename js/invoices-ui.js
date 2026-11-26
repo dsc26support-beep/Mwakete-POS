@@ -35,11 +35,12 @@ const InvoiceUI = (() => {
     tier = await T.getTier(POSDB);
     syncPaymentOption();
     if (!on()) return;
-    const [customers, sales, payments, bal] = await Promise.all([
+    const [customers, sales, payments, bal, refunds] = await Promise.all([
       POSDB.all("customers"),
       POSDB.all("sales"),
       POSDB.all("payments"),
       POSDB.get("settings", "balances"),
+      POSDB.all("refunds"),
     ]);
     const balances = bal?.value || {};
     const trade = customers
@@ -51,7 +52,7 @@ const InvoiceUI = (() => {
             I.accountRow(
               c,
               balances[c.id]?.amount ?? 0,
-              I.pendingBalance(sales, payments, c.id),
+              I.pendingBalance(sales, payments, c.id, refunds),
               c.creditLimit,
               balances[c.id]?.at,
             ),
@@ -96,6 +97,24 @@ const InvoiceUI = (() => {
       toast("Choose a trade customer to sell on account.");
       return false;
     }
+    // Minimum trade quantity: a product can require a minimum for trade (account / trade-customer) sales.
+    if (mode === "account" || (customer && customer.type === "trade")) {
+      for (const l of cart) {
+        const p = await POSDB.get("products", l.productId || l.id);
+        const units = l.qty * (l.packUnits || 1);
+        if (p && p.minQty && units < p.minQty) {
+          toast(
+            p.name +
+              ": trade sales need at least " +
+              p.minQty +
+              " (this sale has " +
+              units +
+              ").",
+          );
+          return false;
+        }
+      }
+    }
     const rate = await taxRate();
     const lines = cart.map((l) => ({
       price: l.price,
@@ -113,15 +132,16 @@ const InvoiceUI = (() => {
       return false;
     }
     if (mode === "account") {
-      const [sales, payments, bal] = await Promise.all([
+      const [sales, payments, bal, refunds] = await Promise.all([
         POSDB.all("sales"),
         POSDB.all("payments"),
         POSDB.get("settings", "balances"),
+        POSDB.all("refunds"),
       ]);
       const known = bal?.value?.[customer.id];
       const o = I.overLimit({
         confirmed: known?.amount ?? 0,
-        pending: I.pendingBalance(sales, payments, customer.id),
+        pending: I.pendingBalance(sales, payments, customer.id, refunds),
         invoiceTotal: t.total,
         creditLimit: customer.creditLimit,
       });

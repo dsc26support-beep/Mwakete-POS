@@ -26,7 +26,7 @@ One app, three tiers, chosen in **Business setup → Business type** (stored loc
 | --- | --- | --- |
 | **Counter** | Restaurants, micro-sellers (very limited products) | The original app, unchanged. Default for every existing install. |
 | **Retail** | Shops with many products | Barcode scan-to-add (keyboard-style scanner + Enter, exact SKU match), reorder levels and low-stock list, product categories, percent/fixed discounts, receipts (print/copy/reopen from Sales history), customers, and reports (sales by day/category, top products, stock value). |
-| **Wholesale** | Trade sellers | **Parts 1-2 of 4 built (trade selling, invoices and credit ledger):** everything in Retail plus named **price lists** (per-product price per list; falls back to the base price), **pack sizes** (e.g. Carton = 24; own barcode; optional fixed pack price, else unit price × units; stock always counted in single units), **trade customers** (price list, credit limit and payment terms as notes), and tax settings (default 12.5%, prices before tax, per-product tax-exempt flag). Choosing a trade customer selects their price list at the till and re-prices the cart. **Part 2 (invoices and credit ledger):** every Wholesale sale is a **tax invoice** (prices before tax, 12.5% by default, tax computed once on the taxable amount after a pro-rata discount, per-product exempt flag), paid at the till or **on account** (needs a trade customer). Invoice numbers are `INV-<device code>-<n>`. Over a customer's credit limit you get a warning and can continue (offline, the balance can be stale). The **Accounts** tab shows each trade customer's *confirmed* balance (from the ledger) plus *pending on this device*, lets you record cash payments against the account balance (not matched to invoices), and lists invoices. A rejected record is kept, shows its reason, and can be retried. **The credit ledger is NOT production-ready** (see Ledger below). **Not built yet:** purchase orders (PR 3), quotes and delivery notes (PR 4); also refunds/credit notes, voiding invoices, per-invoice payment allocation and customer statements. See `docs/ROADMAP.md`. |
+| **Wholesale** | Trade sellers | **All 4 parts built (trade selling, tax invoices and credit accounts, purchase orders, quotes and delivery notes):** everything in Retail plus named **price lists** (per-product price per list; falls back to the base price), **pack sizes** (e.g. Carton = 24; own barcode; optional fixed pack price, else unit price × units; stock always counted in single units), **trade customers** (price list, credit limit and payment terms as notes), and tax settings (default 12.5%, prices before tax, per-product tax-exempt flag). Choosing a trade customer selects their price list at the till and re-prices the cart. **Part 2 (invoices and credit ledger):** every Wholesale sale is a **tax invoice** (prices before tax, 12.5% by default, tax computed once on the taxable amount after a pro-rata discount, per-product exempt flag), paid at the till or **on account** (needs a trade customer). Invoice numbers are `INV-<device code>-<n>`. Over a customer's credit limit you get a warning and can continue (offline, the balance can be stale). The **Accounts** tab shows each trade customer's *confirmed* balance (from the ledger) plus *pending on this device*, lets you record cash payments against the account balance (not matched to invoices), and lists invoices. A rejected record is kept, shows its reason, and can be retried. **The credit ledger is NOT production-ready** (see Ledger below). **Also built (see "What the app does" below):** purchase orders and suppliers, quotes that become invoices once, delivery notes, credit notes (refunds), customer statements with oldest-first payment allocation. **Not built:** per-invoice payment allocation stored as a record (it is worked out from the records instead), voiding an invoice other than by a credit note, tax-law review of invoice wording. See `docs/ROADMAP.md`. |
 
 Important limits:
 - The tier is a **UI setting, not an authorization boundary**. Real enforcement needs the authenticated backend.
@@ -38,6 +38,8 @@ Important limits:
 - The sample Apps Script (`google-apps-script/Code.gs`) now recomputes every sale in integer cents and **rejects** a total that does not equal items minus discount, a discount above the subtotal, or malformed line items. It also stores Discount / Customer ID / Tier columns and upgrades an old 6-column sheet header. Re-deploy your Apps Script after updating.
 
 ## Credit ledger (Wholesale invoices) — NOT production-ready
+> **Update:** with a **cloud account** (Firebase) the invoices, payments and credit notes go to Firestore instead, with a verified sign-in, owner/cashier roles and append-only rules. That removes the "no verified sign-in" problem described below. It does **not** make the ledger production-ready on its own: the server still cannot recompute a sale's total (no Cloud Functions), so the owner's and cashiers' devices are trusted for prices and arithmetic. The Google Sheet ledger below is the older optional backend.
+
 Invoices, payments and balances are kept in the **business's own Google Sheet** through `google-apps-script/Code.gs` (schema v2). Read this before enabling it:
 - **No verified sign-in.** The Apps Script cannot yet verify who is calling it (secrets may not live in the browser). Do **not** use the ledger with real customer or payment data until authenticated Google sign-in and owner-authorised provisioning exist.
 - **Off until the owner switches it on.** Invoices and payments are rejected with "Ledger not enabled" unless the owner sets the script property `LEDGER_ENABLED=true`. Optional `TAX_RATE` (for example `12.5`) rejects invoices at any other rate. Plain sales (Counter, Retail and cash sales without an invoice) never need the ledger.
@@ -64,10 +66,51 @@ npm run test:e2e
 
 `tests/e2e/tiers.e2e.js` seeds a v1 database like an existing install, upgrades it, and checks Counter is unchanged, Retail features work, offline reload keeps data, and switching tiers keeps data. `tests/e2e/invoices.e2e.js` seeds a v3 database, upgrades it to v4, and runs invoices, over-limit warnings, payments and rejected/retried records against the **real `Code.gs`** (served to the browser through a stub), including a poison record, reports excluding tax, and offline reload. `tests/e2e/wholesale.e2e.js` seeds a v2 (Retail) database, upgrades it to v3, and checks price lists, pack sales (stock in single units), trade-customer pricing, re-pricing, barcode scan of a pack, tier switching and offline reload.
 
-## Important status
-This is a **working local prototype / integration foundation**, not a production-ready POS. It does not yet implement secure Google OAuth, automatic Google Drive/Sheets/Apps Script provisioning, production authentication, Mwakete API integration, refunds, staff permissions, multi-outlet inventory, digital-payment verification, or a complete server-authoritative stock ledger. Do not use it for live business transactions until those items are implemented and independently tested.
+### Full test inventory
+Run everything with these (each prints its own pass/fail count):
 
-The Apps Script sample is a starting point only. Its endpoint currently accepts requests without production-grade identity verification. Do not deploy it publicly with real customer or financial data. Add authenticated identity validation, strict access control, schema validation, rate limiting and audit logging first.
+| What | Command | Needs |
+| --- | --- | --- |
+| Unit tests (349) | `npm test` | Node 20+ |
+| Browser suites (19: tiers, wholesale, invoices, refunds, register, stock, trade, CSV, resilience, backup, checkout, catalogue, transactions, delivery, analytics, security, scan, PWA, onboarding) | `NODE_PATH=$(npm root -g) npm run test:e2e` | Playwright + Chromium |
+| Firestore rules, emulator (50, including staff roles) | `cd tests/rules && npm install && npm test` | Java 11+ |
+| Cloud flows, owner + cashier, emulators | `NODE_PATH=$(npm root -g) npx -y firebase-tools@latest emulators:exec --only auth,firestore --project mwakete-pos "node tests/e2e/firebase-cloud.e2e.js"` | Playwright, Java 11+ |
+| Accessibility scan (axe, WCAG 2.1 A/AA, every screen and business type, plus keyboard checks on dialogs) | `cd tests/a11y && npm install && NODE_PATH=$(npm root -g) node a11y.e2e.js` | Playwright |
+
+Automated accessibility checks catch only part of what matters. A person using a screen reader, large text and the keyboard alone should still try each screen before a shop depends on it.
+
+## What the app does
+| Area | What is built | Where |
+| --- | --- | --- |
+| Selling | Counter, Retail and Wholesale tills; discounts; barcode Enter-to-add; receipts; pack sizes; price lists | Quick sale |
+| Refunds | Partial or full refund of any sale as an append-only **credit note**; the sale is never changed; refunds can never add up to more than the sale; stock can be put back; an invoice on account is credited to the customer's account | Sales history → open a sale → Refund… |
+| Register | Open with a float, close with a count; expected cash = float + cash sales + cash payments − cash refunds; shift report; short/over shown | Register |
+| Stock | Every hand change (receive, damage, count, correction) recorded with a reason; stock never below 0 | Stock |
+| Purchasing | Suppliers and purchase orders (draft → ordered → received or cancelled); receiving adds stock; a received or cancelled order is frozen | Purchasing (Wholesale, owner) |
+| Quotes | Quote with exact tax and an expiry date; **Make invoice** loads it into the till at the quoted prices; a quote can become one invoice only | Quotes (Wholesale) |
+| Delivery notes | Goods and a signature box, no prices, from any invoice | Receipt of an invoice |
+| Statements | A customer's invoices, payments and credit notes with a running balance; payments are matched to the **oldest invoices first** | Accounts → Statement |
+| CSV | Import with a preview, per-row problems, duplicate detection (barcode, then name) and stock kept unless you choose otherwise; export with spreadsheet-formula protection | Products |
+| Cloud (optional) | Email/password sign-in, verified email, owner and cashier roles, sync of sales, payments, credit notes, shifts, stock changes, products, purchase orders and quotes, owner's whole-business report | Business setup |
+| Offline | Everything above works offline; an unfinished sale survives a reload; failed syncs retry by themselves (30 s, then longer, at most every 15 min); long lists stay fast on a slow phone | Always |
+| Your data | Download and restore a backup file; diagnostics summary for support (no business content) | Business setup |
+| Payments | Cash with change due; EFTPOS, internet banking and M-PAiSA **recorded** (never verified); references; split payments; the shop picks which methods it accepts; hold and resume sales | Quick sale |
+| Products | Edit, archive, description, unit, cost price and picture (device only), bulk edits, filters, stock value, out-of-stock alerts, price history | Products |
+| Sales history | Receipt numbers, search, filters, details with record checks, CSV export | Sales |
+| Receipts | Send through your own email, SMS or WhatsApp app with a queue and statuses you confirm | Sales -> Details |
+| Reports | Today / week / month / custom period; filters; profit estimate with stated assumptions; print and CSV | Reports |
+| Staff and security | Cashier, manager, inventory, auditor roles; screen-lock PIN and idle lock; tamper-evident activity log; device name | Business setup |
+| Barcodes | Keyboard scanners anywhere on the till; camera scanning where the browser supports it; unknown barcode -> new product | Quick sale |
+| App | Installable (PNG icons), install button, update banner, sync backlog count, first-run set-up card | Always |
+
+More: `docs/ARCHITECTURE.md`, `OFFLINE_SYNC.md`, `DATA_MODEL.md`, `TESTING.md`, `TROUBLESHOOTING.md`, `DEPLOYMENT.md`, `FIREBASE_SETUP.md`, `API_DOCUMENTATION.md`, `MWAKETE_INTEGRATION.md`, `CHANGELOG.md` and the line-by-line `CAPABILITY_REGISTER.md`.
+
+Stock is counted **per device**, not shared between tills (see `SECURITY.md`). Credit notes, shifts, stock changes, suppliers, purchase orders and quotes sync only through a cloud account.
+
+## Important status
+This is a **complete, tested application for a supervised pilot**, not yet a product to rely on without supervision. Do **not** use it for live business transactions until the items in `SECURITY.md` → "Production blockers" are done: an independent security review, a tax-law review of the invoice wording, and a trial on the real phones, barcode scanners and printers in a pilot shop. What it still does **not** do: verify digital payments (a recorded card/mobile payment is only a record), check on the server that a sale's total equals its lines (this needs Cloud Functions on Firebase's paid plan, which this project deliberately does not use), share stock between devices, connect to the Mwakete Marketplace (the API contract is not available), or drive barcode cameras and thermal printers.
+
+The Apps Script sample is the older optional backend. Its endpoint accepts requests without production-grade identity verification. Do not use it with real customer or financial data; use a cloud account instead.
 
 ## Run locally
 Serve this directory over localhost (service workers and IndexedDB require a secure context; localhost is treated as secure). For example, with Python installed:
@@ -100,3 +143,18 @@ Mwakete sellers must use the existing Mwakete identity, customer and inventory s
 - `service-worker.js`, `manifest.webmanifest`: PWA shell
 - `google-apps-script/`: sample per-business Apps Script backend
 - `docs/`: implementation roadmap and API contracts
+- `firebase.json`, `firestore.rules`, `firestore.indexes.json`, `.firebaserc`: Firebase project config
+- `js/integrations/firebase*.js`, `js/cloud-ui.js`: optional cloud account
+
+## Cloud account (Firebase), optional
+- **Settings → Cloud account:** create an account or sign in with email and password (Firebase Authentication, project `mwakete-pos`). While signed in, pending sales, payments and trade customers sync to Cloud Firestore (Standard edition, `australia-southeast1`). Signed out, the app uses the optional Google Apps Script backend or stays local-only.
+- **Data layout:** `businesses/{ownerUid}` with `sales`, `payments` and `customers` subcollections. The sale or payment ID is the document ID, so sync is idempotent. See `firestore.rules` (owner-only, append-only ledger, default deny).
+- **Balances:** read back from Firestore (account invoices minus payments, integer cents) for the customers in each sync.
+- **SDK:** Firebase v11.10.0 loads from Google's CDN on demand, so the app still starts offline.
+- **Deploy:** `npx -y firebase-tools@latest deploy --only auth,firestore --project mwakete-pos`
+- **IDs:** Web app `1:648701661858:web:e96059c73228e578d43dfb` (used by this PWA). Android app `1:648701661858:android:a415bbcc6cb9df9cd43dfb` is registered in the same project but not used by this PWA.
+- **Email verification:** after sign-up Firebase emails a link. Until it is opened (then press **I have verified**), nothing syncs and sales stay safely on the device. The cloud rules refuse unverified accounts too.
+- **Roles:** the **owner** is the account whose ID is the business ID (shown as "Your business code"). A **cashier** creates their own account, verifies their email and sends the owner their **staff code**. The owner adds them under *Staff*; the cashier then enters the business code to join. Cashiers can sell and see the product list; they cannot change products, customers or staff, and see only their own sales. The owner can remove access at any time (records are kept). Every sale and payment is stamped with the uid of who recorded it.
+- **Product sync:** the owner's catalogue changes (name, price, SKU, category, reorder level, price lists, pack sizes, tax-exempt flag) are pushed; every device pulls. Newest edit wins. **Stock is per device**: it is copied from the cloud only when a product is new on that device, so two tills never overwrite each other's counts. A product the owner deletes is removed from synced devices. Owner-created trade customers are copied to cashier devices (existing local customers are never overwritten).
+- **Tests:** see "Full test inventory" above. The app only connects to the Firebase emulators on `http://localhost:<port>/?emulator=1`.
+- **Not built yet:** App Check (needs a reCAPTCHA key from the Firebase console), multi-device stock sync, customer sync beyond owner-created trade customers, removing a business or account from the app. See `SECURITY.md`.

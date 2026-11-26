@@ -99,6 +99,20 @@ const RetailUI = (() => {
     sale.subtotal = t.subtotal;
     sale.total = t.total;
     if (t.discount) sale.discount = t.discount;
+    // A discount above the shop's limit needs the manager's approval PIN (when one is set).
+    if (
+      t.discount &&
+      t.subtotal > 0 &&
+      window.SecurityUI &&
+      !(await SecurityUI.approveIfNeeded(
+        "discount",
+        (t.discount.amount / t.subtotal) * 100,
+        "Discount of " +
+          Math.round((t.discount.amount / t.subtotal) * 1000) / 10 +
+          "%",
+      ))
+    )
+      return false;
     const cust = T.has(tier, "customers") ? $("saleCustomer").value : "";
     if (cust) sale.customerId = cust; // opaque local id only; the name never leaves the device
     sale.items = sale.items.map((it, i) =>
@@ -129,6 +143,20 @@ const RetailUI = (() => {
         ? await InvoiceUI.textFor(sale)
         : R.buildReceiptText(sale, name?.value || "Mwakete POS", cust);
     $("receiptBody").innerHTML = R.receiptHtml(lastReceipt);
+    $("receiptPanel").dataset.saleId = sale.id;
+    if ($("receiptRefund")) $("receiptRefund").hidden = false;
+    if ($("receiptDelivery")) $("receiptDelivery").hidden = !sale.invoice;
+    $("receiptPanel").classList.remove("hidden");
+    $("receiptClose").focus();
+  }
+
+  // Shows any 32-column document (for example a credit note) in the same viewer. No refund button on it.
+  function showText(text) {
+    lastReceipt = text;
+    $("receiptBody").innerHTML = R.receiptHtml(text);
+    $("receiptPanel").dataset.saleId = "";
+    if ($("receiptRefund")) $("receiptRefund").hidden = true;
+    if ($("receiptDelivery")) $("receiptDelivery").hidden = true;
     $("receiptPanel").classList.remove("hidden");
     $("receiptClose").focus();
   }
@@ -149,6 +177,44 @@ const RetailUI = (() => {
     return { ...v.value, ...w };
   }
 
+  /* A scanned or typed barcode: add the product (or pack) to the cart. Returns true if something was added. */
+  async function scanCode(raw) {
+    const code = window.ScanCore
+      ? ScanCore.clean(raw)
+      : String(raw || "").trim();
+    if (!code) return false;
+    const p = R.findBySku(await POSDB.all("products"), code);
+    if (!p && window.WholesaleUI && (await WholesaleUI.addPackBySku(code)))
+      return true;
+    if (!p) {
+      if (window.ScanUI) ScanUI.unknown(code);
+      else toast("No product with that barcode.");
+      return false;
+    }
+    const card = document.querySelector(
+      '[data-add="' + CSS.escape(p.id) + '"]',
+    );
+    if (!card) {
+      // Not drawn at the till: archived, or filtered out by the search box.
+      if (p.archived) {
+        toast(p.name + " is archived and cannot be sold.");
+        return false;
+      }
+      products_add(p);
+      return true;
+    }
+    card.click();
+    return true;
+  }
+  // Adds a product that has no card on screen (the grid shows a limited number of products).
+  function products_add(p) {
+    const holder = document.createElement("button");
+    holder.dataset.add = p.id;
+    document.body.appendChild(holder);
+    holder.click();
+    holder.remove();
+  }
+
   async function init() {
     ["discountType", "discountValue"].forEach((id) =>
       $(id).addEventListener("input", () => afterCart(lastCart)),
@@ -156,20 +222,12 @@ const RetailUI = (() => {
     $("productSearch").addEventListener("keydown", async (e) => {
       if (e.key !== "Enter" || !T.has(tier, "barcode")) return;
       e.preventDefault();
-      const code = e.target.value;
-      const p = R.findBySku(await POSDB.all("products"), code);
-      if (!p && window.WholesaleUI && (await WholesaleUI.addPackBySku(code))) {
-        e.target.value = "";
-        e.target.dispatchEvent(new Event("input"));
-        return;
+      const input = e.target;
+      const found = await scanCode(input.value);
+      if (found) {
+        input.value = "";
+        input.dispatchEvent(new Event("input"));
       }
-      if (!p) return toast("No product with that barcode.");
-      e.target.value = "";
-      e.target.dispatchEvent(new Event("input"));
-      const card = document.querySelector(
-        '[data-add="' + CSS.escape(p.id) + '"]',
-      );
-      if (card) card.click();
     });
     $("customerForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -179,7 +237,14 @@ const RetailUI = (() => {
       if (!extras) return;
       const r = await R.addCustomer(
         POSDB,
-        { name: f.name.value, phone: f.phone.value, notes: f.notes.value },
+        {
+          name: f.name.value,
+          phone: f.phone.value,
+          notes: f.notes.value,
+          email: f.email.value,
+          address: f.address.value,
+          category: f.category.value,
+        },
         newId(),
       );
       if (!r.ok) return toast(r.error);
@@ -223,7 +288,17 @@ const RetailUI = (() => {
     });
     await render();
   }
-  return { init, render, afterCart, decorateSale, afterSale, productExtras };
+  return {
+    init,
+    render,
+    afterCart,
+    decorateSale,
+    afterSale,
+    productExtras,
+    showText,
+    showReceipt,
+    scanCode,
+  };
 })();
 // `const` in a classic script is not a window property; app.js checks window.RetailUI before calling the hooks.
 window.RetailUI = RetailUI;

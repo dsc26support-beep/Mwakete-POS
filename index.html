@@ -15,10 +15,11 @@
     <a class="brand" href="#"><span class="brand-mark">M</span><span>Mwakete <small>POS</small></span></a>
     <div class="connection"><span id="onlineDot"></span><span id="connectionText">Checking connection…</span></div>
   </header>
+  <div id="updateBar" class="update-bar hidden" role="status">A new version of the app is ready. <button id="updateReload" class="button secondary" type="button">Reload now</button> <button id="updateLater" class="text-button" type="button">Later</button></div>
   <main class="shell">
     <section class="welcome">
       <div><p class="eyebrow">YOUR BUSINESS, YOUR CONTROL</p><h1>Simple sales. Even offline.</h1><p>Run your counter, track stock and keep selling when the internet drops.</p></div>
-      <div class="sync-card"><span class="sync-icon">↻</span><div><strong id="syncStatus">Ready to work</strong><small id="syncDetail">Your sales are saved on this device.</small></div><button id="syncNow" class="button secondary">Sync now</button></div>
+      <div class="sync-card"><span class="sync-icon">↻</span><div><strong id="syncStatus">Ready to work</strong><small id="syncDetail">Your sales are saved on this device.</small><small id="pendingCount" role="status"></small></div><button id="syncNow" class="button secondary">Sync now</button></div>
     </section>
     <nav class="tabs" aria-label="Main navigation">
       <button class="tab active" data-view="sale">Quick sale</button>
@@ -28,13 +29,22 @@
       <button class="tab hidden" data-view="pricelists" data-feature="priceTiers">Price lists</button>
       <button class="tab hidden" data-view="accounts" data-feature="invoices">Accounts</button>
       <button class="tab hidden" data-view="reports" data-feature="reports">Reports</button>
+      <button class="tab hidden" data-view="register" data-feature="register">Register</button>
+      <button class="tab hidden" data-view="quotes" data-feature="quotes">Quotes</button>
+      <button class="tab hidden" data-view="stock" data-feature="stock">Stock</button>
+      <button class="tab hidden" data-view="purchasing" data-feature="purchaseOrders" data-owner-only>Purchasing</button>
       <button class="tab" data-view="setup">Business setup</button>
       <button class="tab" data-view="help">Help &amp; guides</button>
     </nav>
     <section id="view-sale" class="view">
+      <div id="setupCard" class="panel hidden">
+        <p class="eyebrow">WELCOME</p><h2>Set up your shop in a minute</h2>
+        <p class="muted">Name your business, choose the edition and the payments you accept. You can change all of it later.</p>
+        <div class="row-actions"><button id="setupStart" class="button primary" type="button">Start set-up</button><button id="setupSkip" class="button secondary" type="button">Not now</button></div>
+      </div>
       <div class="workspace">
         <div class="panel catalog">
-          <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Choose products</h2></div><input id="productSearch" class="search" placeholder="Search or scan barcode…" autocomplete="off"></div>
+          <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Choose products</h2></div><input id="productSearch" class="search" placeholder="Search or scan barcode…" autocomplete="off"><button id="scanCamera" class="button secondary hidden" data-feature="barcode" type="button">Scan with camera</button></div>
           <div id="productGrid" class="product-grid"></div>
           <p id="emptyProducts" class="empty hidden">No products yet. Add your first product in Products.</p>
         </div>
@@ -56,9 +66,33 @@
             <select id="salePriceList"><option value="">Base price</option></select>
           </div>
           <label class="field-label" for="paymentMethod">Payment method</label>
-          <select id="paymentMethod"><option value="cash">Cash</option><option value="other">Other (record only)</option></select>
+          <select id="paymentMethod"><option value="cash">Cash</option><option value="eftpos">EFTPOS / card (record only)</option><option value="internet_banking">Internet banking (record only)</option><option value="mpaisa">M-PAiSA (record only)</option><option value="other">Other (record only)</option></select>
+          <div id="tenderRow" class="retail-box">
+            <label class="field-label" for="cashTendered">Cash received</label>
+            <input id="cashTendered" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Leave empty if exact">
+            <p id="changeDue" class="hint" role="status" aria-live="polite"></p>
+          </div>
+          <div id="refRow" class="retail-box hidden">
+            <label class="field-label" for="payRef">Payment reference (optional)</label>
+            <input id="payRef" maxlength="40" placeholder="Transaction / receipt number from the payer">
+          </div>
+          <div class="retail-box">
+            <label class="check"><input id="splitOn" type="checkbox"> Split payment</label>
+            <div id="splitBox" class="hidden">
+              <label class="field-label" for="splitMethod">Also paid by</label>
+              <select id="splitMethod"><option value="eftpos">EFTPOS / card</option><option value="internet_banking">Internet banking</option><option value="mpaisa">M-PAiSA</option><option value="other">Other</option></select>
+              <label class="field-label" for="splitAmount">Amount paid this way</label>
+              <input id="splitAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+              <input id="splitRef" maxlength="40" placeholder="Reference (optional)" aria-label="Reference for the second payment">
+            </div>
+          </div>
           <button id="checkout" class="button primary full" disabled>Complete cash sale</button>
-          <p class="hint">Offline cash sales are saved on this device and queued for sync. “Other” payments are not verified by this app.</p>
+          <button id="sendLast" class="button secondary full hidden" type="button">Send the last receipt (WhatsApp, email, SMS)…</button>
+          <div class="inline">
+            <button id="holdSale" class="button" type="button" disabled>Hold sale</button>
+            <button id="resumeSale" class="button" type="button">Held sales (<span id="heldCount">0</span>)</button>
+          </div>
+          <p class="hint">Offline sales are saved on this device and queued for sync. EFTPOS, banking and M-PAiSA payments are only recorded: this app cannot verify them.</p>
         </aside>
       </div>
     </section>
@@ -84,7 +118,36 @@
           <label data-feature="tax" class="check hidden"><input type="checkbox" name="taxExempt"> Tax exempt (no tax on this product when invoices are added)</label>
           <button class="button primary" type="submit">Add product</button>
         </form>
+        <div class="filter-row" role="search">
+          <input id="prodFilterText" type="search" placeholder="Search name, barcode or description" aria-label="Search products">
+          <select id="prodFilterCat" aria-label="Filter by category"><option value="">All categories</option></select>
+          <select id="prodFilterAvail" aria-label="Filter by availability"><option value="">Active products</option><option value="out">Out of stock</option><option value="low">Low stock</option><option value="available">Available</option><option value="archived">Archived</option></select>
+        </div>
+        <p id="stockAlerts" class="hint" role="status"></p>
+        <p id="stockValue" class="hint"></p>
+        <div class="row-actions"><button id="stockReportCsv" class="button secondary" type="button">Stock report (CSV)</button><button id="stockReportPrint" class="button secondary" type="button">Print stock report</button></div>
+        <div class="bulk-bar" data-owner-only>
+          <label class="check"><input id="prodSelectAll" type="checkbox"> Select all shown</label>
+          <select id="bulkType" aria-label="Bulk change"><option value="percent">Change price by %</option><option value="category">Set category</option><option value="unit">Set unit</option><option value="archive">Archive</option><option value="restore">Restore</option></select>
+          <input id="bulkValue" maxlength="40" placeholder="Value" aria-label="Bulk change value">
+          <button id="bulkApply" class="button secondary" type="button">Apply to selected</button>
+        </div>
         <div id="productTable" class="table-wrap"></div>
+        <details id="csvPanel" class="csv-box" data-owner-only>
+          <summary>Import or export products (CSV file)</summary>
+          <p class="hint">Use a file saved from Excel or Google Sheets as <strong>CSV</strong>. The first row must be headings such as <code>name, price, stock, barcode</code>. Nothing is saved until you press <strong>Import</strong>, and existing stock counts are kept unless you choose otherwise.</p>
+          <div class="row-actions">
+            <label class="button secondary">Choose a CSV file<input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden></label>
+            <button class="button secondary" type="button" id="csvExport">Export products</button>
+          </div>
+          <div id="csvMap" class="settings-form hidden"></div>
+          <div id="csvPreview" aria-live="polite"></div>
+          <div id="csvOptions" class="settings-form hidden">
+            <label>If a product already exists<select id="csvDup"><option value="skip">Skip it</option><option value="update">Update its price and details</option></select></label>
+            <label class="check"><input type="checkbox" id="csvStock"> Also replace the stock count when updating</label>
+            <button class="button primary" type="button" id="csvImport">Import</button>
+          </div>
+        </details>
       </div>
       <div class="panel hidden" data-feature="lowStock">
         <p class="eyebrow">STOCK ALERTS</p><h2>Low stock</h2>
@@ -93,7 +156,118 @@
       </div>
     </section>
     <section id="view-sales" class="view hidden">
-      <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div><div id="salesList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">TRANSACTIONS</p><h2>Sales history</h2></div></div>
+        <div class="filter-row" role="search">
+          <input id="txnText" type="search" placeholder="Search receipt, product, reference" aria-label="Search sales">
+          <input id="txnFrom" type="date" aria-label="From date">
+          <input id="txnTo" type="date" aria-label="To date">
+          <select id="txnMethod" aria-label="Payment method"><option value="">Any payment</option><option value="cash">Cash</option><option value="eftpos">EFTPOS / card</option><option value="internet_banking">Internet banking</option><option value="mpaisa">M-PAiSA</option><option value="other">Other</option><option value="account">On account</option></select>
+          <select id="txnStatus" aria-label="Status"><option value="">Any status</option><option>Completed</option><option>Partly refunded</option><option>Fully refunded</option><option>On account</option><option>Not accepted by the cloud</option></select>
+        </div>
+        <p id="txnSummary" class="hint" role="status"></p>
+        <div class="row-actions"><button id="txnExport" class="button secondary" type="button">Export sales (CSV)</button></div>
+        <div id="salesList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">RECEIPTS</p><h2>Delivery queue</h2></div></div><p class="hint">Receipts waiting to be sent by SMS, WhatsApp or email. Sending opens your own app; you confirm it was sent.</p><div id="deliveryList" aria-live="polite"></div></div>
+      <div class="panel hidden" data-feature="refunds"><div class="section-heading"><div><p class="eyebrow">CREDIT NOTES</p><h2>Refunds and returns</h2></div></div><p class="hint">Open a sale and press <strong>Refund…</strong>. A refund never changes the original sale; it is recorded as a credit note. Credit notes reach your cloud account when you are signed in.</p><div id="refundsList"></div></div>
+    </section>
+    <section id="view-register" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">CASH DRAWER</p><h2>Register</h2></div></div>
+        <p class="hint">Count the cash in the drawer when you start and when you finish. The app works out what should be there from <strong>this device's</strong> cash sales, payments and refunds. Selling is never blocked when the register is closed.</p>
+        <div id="registerClosed">
+          <form id="registerOpenForm" class="settings-form">
+            <label>Opening float (cash in the drawer now)<input name="float" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+            <button class="button primary" type="submit">Open register</button>
+          </form>
+        </div>
+        <div id="registerOpen" class="hidden">
+          <p id="registerSince" class="muted"></p>
+          <div id="registerLive"></div>
+          <form id="registerCloseForm" class="settings-form">
+            <label>Cash counted in the drawer<input name="counted" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+            <label>Note (optional)<input name="note" maxlength="200" placeholder="For example: coin short"></label>
+            <p id="registerDiff" class="muted" role="status" aria-live="polite"></p>
+            <button class="button primary" type="submit">Close register</button>
+          </form>
+        </div>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Past shifts</h2></div></div><div id="registerList"></div></div>
+    </section>
+    <section id="view-quotes" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">WHOLESALE</p><h2>Quotes</h2></div></div>
+        <p class="hint">A quote is an offer with prices and an expiry date. When the customer agrees, press <strong>Make invoice</strong>: the goods load into the till at the quoted prices and you finish the sale as normal. A quote can only become one invoice.</p>
+        <form id="quoteForm" class="settings-form">
+          <label>Customer<select name="customer" id="quoteCustomer"></select></label>
+          <label>Customer name (if not saved as a trade customer)<input name="customerName" maxlength="100"></label>
+          <div id="quoteLines" aria-live="polite"></div>
+          <fieldset class="po-add"><legend>Add a product to the quote</legend>
+            <label>Product<select id="quoteProduct"></select></label>
+            <label>Quantity<input id="quoteQty" type="number" inputmode="numeric" min="1" step="1"></label>
+            <label>Price each<input id="quotePrice" type="number" inputmode="decimal" min="0" step="0.01"></label>
+            <button class="button secondary" type="button" id="quoteAddLine">Add to quote</button>
+          </fieldset>
+          <label>Valid for (days)<input name="days" type="number" inputmode="numeric" min="1" max="365" step="1" value="14"></label>
+          <label>Note (optional)<input name="note" maxlength="200"></label>
+          <p id="quoteTotal" class="muted" role="status">Quote total: 0.00</p>
+          <button class="button primary" type="submit">Save quote</button>
+        </form>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">OFFERS</p><h2>Your quotes</h2></div></div><div id="quoteList"></div></div>
+    </section>
+    <section id="view-stock" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">INVENTORY</p><h2>Stock</h2></div></div>
+        <p class="hint">Stock is counted on <strong>this device</strong>. Every change made here is saved with a reason, so you can always see what happened. Sales and refunds adjust stock automatically.</p>
+        <form id="stockForm" class="settings-form">
+          <label>Product<select name="product" id="stockProduct" required></select></label>
+          <label>What happened<select name="action" id="stockAction"></select></label>
+          <label><span id="stockQtyLabel">Quantity</span><input name="qty" type="number" inputmode="numeric" min="0" step="1" required></label>
+          <label>Note (optional)<input name="note" maxlength="200" placeholder="For example: box dropped"></label>
+          <p id="stockPreview" class="muted" role="status" aria-live="polite"></p>
+          <button class="button primary" type="submit">Save stock change</button>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">STOCK TAKE</p><h2>Count the whole shop</h2></div></div>
+        <p class="hint">Type what you really counted on the shelf for each product (leave blank to skip). Press <strong>Check differences</strong> to see what is short or over, then <strong>Apply counts</strong> to set the stock. Each change is saved as a "Stock count" movement.</p>
+        <input id="takeFilter" type="search" placeholder="Find a product" aria-label="Find a product to count">
+        <div id="takeTable" class="table-wrap"></div>
+        <p id="takeSummary" class="hint" role="status" aria-live="polite"></p>
+        <div class="row-actions"><button id="takeCheck" class="button secondary" type="button">Check differences</button><button id="takeApply" class="button primary" type="button">Apply counts</button><button id="takeCsv" class="button secondary" type="button">Differences (CSV)</button></div>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Everything that changed one product's stock</h2></div></div><p class="hint">Uses the product chosen in the form above: hand changes, sales and returns, newest first.</p><div id="productHistoryList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">HISTORY</p><h2>Stock movements</h2></div></div><div id="stockMoves"></div></div>
+    </section>
+    <section id="view-purchasing" class="view hidden">
+      <div class="panel">
+        <div class="section-heading"><div><p class="eyebrow">WHOLESALE</p><h2>Purchase orders</h2></div></div>
+        <p class="hint">Order stock from a supplier, then press <strong>Receive stock</strong> when it arrives. Receiving adds the quantities to this device's stock and records each one. A received or cancelled order cannot be changed.</p>
+        <form id="poForm" class="settings-form">
+          <label>Supplier<input name="supplierName" maxlength="100" list="supplierNames" autocomplete="off" required placeholder="Choose or type a name"></label>
+          <datalist id="supplierNames"></datalist>
+          <div id="poLines" aria-live="polite"></div>
+          <fieldset class="po-add"><legend>Add a product to the order</legend>
+            <label>Product<select id="poProduct"></select></label>
+            <label>Quantity<input id="poQty" type="number" inputmode="numeric" min="1" step="1"></label>
+            <label>Cost each<input id="poCost" type="number" inputmode="decimal" min="0" step="0.01"></label>
+            <button class="button secondary" type="button" id="poAddLine">Add to order</button>
+          </fieldset>
+          <label>Note (optional)<input name="note" maxlength="200"></label>
+          <p id="poTotal" class="muted" role="status">Order total: 0.00</p>
+          <button class="button primary" type="submit">Save as draft</button>
+        </form>
+      </div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">ORDERS</p><h2>Your purchase orders</h2></div></div><div id="poList"></div></div>
+      <div class="panel"><div class="section-heading"><div><p class="eyebrow">SUPPLIERS</p><h2>Suppliers</h2></div></div>
+        <form id="supplierForm" class="settings-form">
+          <label>Name<input name="name" maxlength="100" required></label>
+          <label>Phone (optional)<input name="phone" maxlength="40"></label>
+          <label>Note (optional)<input name="note" maxlength="200"></label>
+          <button class="button secondary" type="submit">Add supplier</button>
+        </form>
+        <div id="supplierList"></div>
+      </div>
     </section>
     <section id="view-customers" class="view hidden">
       <div class="panel">
@@ -102,6 +276,9 @@
         <form id="customerForm" class="settings-form">
           <label>Name<input name="name" maxlength="80" required placeholder="Customer name"></label>
           <label>Phone (optional)<input name="phone" maxlength="20" placeholder="+686 …"></label>
+          <label>Email (optional)<input name="email" type="email" maxlength="120" placeholder="name@example.com"></label>
+          <label>Address (optional)<input name="address" maxlength="120" placeholder="Village / island"></label>
+          <label>Customer group (optional)<input name="category" maxlength="30" placeholder="e.g. Regular, Staff"></label>
           <label>Note (optional)<input name="notes" maxlength="300" placeholder="Short note"></label>
           <label data-feature="tradeCustomers" class="hidden">Customer type<select name="customerType"><option value="retail">Regular customer</option><option value="trade">Trade customer</option></select></label>
           <label data-feature="tradeCustomers" class="hidden">Price list (trade)<select name="priceListId" id="customerPriceList"><option value="">Base price</option></select></label>
@@ -155,8 +332,82 @@
         <div class="section-heading"><div><p class="eyebrow">RETAIL</p><h2>Reports</h2></div></div>
         <div id="reportBody"></div>
       </div>
+      <div class="panel" id="periodReportPanel">
+        <div class="section-heading"><div><p class="eyebrow">THIS DEVICE</p><h2>Report by period</h2></div></div>
+        <div class="filter-row">
+          <label class="sr-only" for="repPeriod">Period</label>
+          <select id="repPeriod"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="week" selected>This week</option><option value="lastweek">Last week</option><option value="month">This month</option><option value="lastmonth">Last month</option><option value="custom">Custom dates</option></select>
+          <input id="repFrom" type="date" aria-label="From date" class="hidden">
+          <input id="repTo" type="date" aria-label="To date" class="hidden">
+          <select id="repCategory" aria-label="Category"><option value="">All categories</option></select>
+          <select id="repMethod" aria-label="Payment method"><option value="">Any payment</option><option value="cash">Cash</option><option value="eftpos">EFTPOS / card</option><option value="internet_banking">Internet banking</option><option value="mpaisa">M-PAiSA</option><option value="other">Other</option><option value="account">On account</option></select>
+          <select id="repStaff" aria-label="Staff"><option value="">All staff</option></select>
+          <select id="repEdition" aria-label="Edition"><option value="">All editions</option><option value="counter">Counter</option><option value="retail">Retail</option><option value="wholesale">Wholesale</option></select>
+        </div>
+        <p id="repError" class="low" role="alert"></p>
+        <div class="row-actions"><button id="repPrint" class="button secondary" type="button">Print</button><button id="repCsv" class="button secondary" type="button">Export CSV</button></div>
+        <div id="periodReportBody" aria-live="polite"></div>
+      </div>
+      <div class="panel" id="cloudReportPanel" data-owner-only>
+        <div class="section-heading"><div><p class="eyebrow">CLOUD ACCOUNT</p><h2>Whole business</h2></div></div>
+        <p class="hint">Adds up the sales and credit notes of <strong>every till and cashier</strong> from your cloud account. It needs an internet connection and a signed-in, verified account. Sales still waiting to sync from a device are not included yet.</p>
+        <form id="cloudReportForm" class="settings-form">
+          <label>Period<select id="cloudReportRange"><option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option></select></label>
+          <button class="button primary" type="submit">Show report</button>
+        </form>
+        <div id="cloudReportBody" aria-live="polite"></div>
+      </div>
     </section>
     <section id="view-setup" class="view hidden">
+      <div class="panel setup-panel" id="mwaketePanel">
+        <p class="eyebrow">OPTIONAL</p><h2>Mwakete Marketplace link</h2>
+        <p>Status: <strong id="mwStatus">Not connected</strong></p>
+        <p id="mwReason" class="muted"></p>
+        <p class="hint">This POS works fully without Mwakete: sales, stock and customers stay in your own business account. Selling through the marketplace would need these from the Mwakete team:</p>
+        <ul id="mwNeeds" class="hint"></ul>
+        <div class="row-actions"><button id="mwConnect" class="button primary" type="button" disabled>Connect to Mwakete</button><button id="mwDisconnect" class="button secondary" type="button" disabled>Disconnect</button></div>
+      </div>
+      <div class="panel setup-panel" id="syncPanel">
+        <p class="eyebrow">SYNC</p><h2>Sync history</h2>
+        <p class="hint">The last 20 finished sync runs on this device. A record the cloud refused stays on the device; fix it, then press <strong>Sync now</strong>. Failed runs retry by themselves.</p>
+        <div id="syncHistory" aria-live="polite"></div>
+        <div class="row-actions"><button id="syncHistoryClear" class="button secondary" type="button">Clear history</button></div>
+      </div>
+      <div class="panel setup-panel" id="installPanel">
+        <p class="eyebrow">INSTALL</p><h2>Use it like an app</h2>
+        <p id="installText" class="muted"></p>
+        <button id="installBtn" class="button primary hidden" type="button">Install the app</button>
+        <p class="hint">Version <span id="installVersion"></span>. Updates download in the background; you are asked before the screen reloads, so a sale in progress is never interrupted.</p>
+      </div>
+      <div class="panel setup-panel" id="securityPanel">
+        <p class="eyebrow">SECURITY</p><h2>This device and screen lock</h2>
+        <p class="muted">These protections live on this device. They stop casual misuse and make changes to the activity log detectable. They cannot stop someone who controls the device itself, so keep backups and use cloud sign-in for staff.</p>
+        <form id="deviceForm" class="settings-form">
+          <label>Device name<input name="deviceName" maxlength="30" placeholder="e.g. Front till"></label>
+          <p class="hint">Device code: <code id="deviceCodeText">…</code> · App version <span id="appVersionText"></span> · Storage kept by the browser: <span id="persistText">unknown</span></p>
+          <div class="row-actions"><button class="button primary" type="submit">Save name</button><button class="button secondary" type="button" id="persistBtn">Ask the browser to keep my data</button></div>
+        </form>
+        <form id="pinForm" class="settings-form">
+          <label>Lock PIN (4 to 8 digits)<input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>
+          <label>Lock after idle<select name="idle" id="idleSelect"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></label>
+          <p id="pinState" class="hint" role="status"></p>
+          <div class="row-actions"><button class="button primary" type="submit">Save lock settings</button><button class="button secondary" type="button" id="lockNow">Lock now</button><button class="button secondary" type="button" id="pinClear">Remove PIN</button></div>
+        </form>
+        <h3>Manager approval</h3>
+        <p class="muted">Ask for a manager's PIN when a discount or a refund is bigger than a limit you set. Leave a limit at 0 for no limit. Signed-in owners and managers are not asked.</p>
+        <form id="approvalForm" class="settings-form">
+          <label>Approval PIN (4 to 8 digits)<input name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>
+          <label>Ask above this discount (%)<input name="discountPct" type="number" min="0" max="100" step="0.1" value="0"></label>
+          <label>Ask above this refund amount<input name="refundAmount" type="number" min="0" step="0.01" value="0"></label>
+          <p id="approvalState" class="hint" role="status"></p>
+          <div class="row-actions"><button class="button primary" type="submit">Save approval settings</button><button class="button secondary" type="button" id="approvalClear">Remove approval PIN</button></div>
+        </form>
+        <h3>Activity log</h3>
+        <div class="filter-row" role="search"><input id="auditText" type="search" placeholder="Search the log" aria-label="Search the activity log"><select id="auditAction" aria-label="Type"><option value="">All activity</option></select></div>
+        <p id="auditState" class="hint" role="status"></p>
+        <div class="row-actions"><button id="auditExport" class="button secondary" type="button">Export log (CSV)</button></div>
+        <div id="auditList"></div>
+      </div>
       <div class="panel setup-panel">
         <p class="eyebrow">BUSINESS TYPE</p><h2>Choose your POS</h2>
         <p class="muted">Pick what fits your business. You can change this later; your products and sales are kept.</p>
@@ -171,16 +422,89 @@
           <button class="button primary" type="submit">Save tax settings</button>
         </form>
       </div>
+      <div class="panel" id="backupPanel">
+        <p class="eyebrow">YOUR DATA</p><h2>Backup and support</h2>
+        <div data-owner-only>
+          <p class="hint">Customers, price lists and settings live <strong>only on this device</strong>. Download a backup file now and then, and keep it somewhere safe (for example your email or a USB stick). Restoring puts those records back; it never deletes anything, and a record with the same ID is replaced.</p>
+          <div class="row-actions">
+            <button class="button secondary" type="button" id="backupDownload">Download a backup file</button>
+            <label class="button secondary">Restore from a backup file<input type="file" id="backupFile" accept=".json,application/json" hidden></label>
+          </div>
+          <p id="backupLast" class="muted"></p>
+          <div id="backupPreview" aria-live="polite"></div>
+        </div>
+        <details id="diagBox">
+          <summary>Diagnostics for support</summary>
+          <p class="hint">If something is not working, copy this and send it to support. It has version numbers, counts and error messages only: no sales, product or customer names, amounts or email addresses. Nothing is sent unless you send it.</p>
+          <div class="row-actions">
+            <button class="button secondary" type="button" id="diagCopy">Copy</button>
+            <a class="button secondary" id="diagMail" href="#">Email support</a>
+          </div>
+          <pre id="diagText" tabindex="0" aria-label="Diagnostics for support"></pre>
+        </details>
+      </div>
       <div class="panel setup-panel">
         <p class="eyebrow">GET STARTED</p><h2>Set up your business</h2>
         <p class="muted">Your business name and currency are stored locally on this device. Connect a Google backend when the secure provisioning service is configured.</p>
         <form id="settingsForm" class="settings-form">
           <label>Business name<input name="businessName" maxlength="100" placeholder="Your business name" required></label>
           <label>Currency code<input name="currency" maxlength="8" value="AUD" required></label>
+          <label>When a sale needs more than the stock on this device<select name="stockGuard"><option value="warn">Warn, but allow the sale</option><option value="block">Do not allow the sale</option></select></label>
+          <label>Round cash payments to the nearest<select name="cashRounding"><option value="0">No rounding</option><option value="0.05">5 cents</option><option value="0.1">10 cents</option></select></label>
           <label>Google Apps Script Web App URL<input name="apiUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <button class="button primary" type="submit">Save settings</button>
         </form>
         <div class="notice"><strong>Google connection safety</strong><p>Never enter your Google password here. The production Google sign-in and automatic spreadsheet / Apps Script provisioning flow requires a verified Google OAuth client and deployment configuration. This starter does not pretend that provisioning is already active.</p></div>
+        <div class="panel" id="cloudPanel">
+          <p class="eyebrow">CLOUD ACCOUNT</p><h3>Back up and sync with your email</h3>
+          <p class="muted">Optional and free. Sales are always saved on this device first, and are sent to your private cloud account when you are online and signed in. Never use your email password here: choose a new password for this app.</p>
+          <p id="cloudStatus" class="muted" role="status">Not signed in.</p>
+          <form id="cloudForm" class="settings-form" novalidate>
+            <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+            <label>Password (at least 8 characters)<input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128"></label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="button primary" type="submit" id="cloudSignIn">Sign in</button>
+              <button class="button secondary" type="button" id="cloudSignUp">Create account</button>
+              <button class="button secondary" type="button" id="cloudReset">Forgot password</button>
+            </div>
+          </form>
+          <div id="cloudVerify" class="notice warn hidden">
+            <strong>Verify your email to start syncing</strong>
+            <p>We sent a link to your email. Open it, then press the button below. Your sales stay saved on this device until then.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="button primary" type="button" id="cloudRefresh">I have verified</button>
+              <button class="button secondary" type="button" id="cloudResend">Send the email again</button>
+            </div>
+          </div>
+          <div id="cloudOwner" class="hidden">
+            <h4>Your business code</h4>
+            <p class="muted">Staff need this code to join your business. It is not a password, but share it only with people you trust.</p>
+            <p><code id="cloudBizCode"></code> <button class="text-button" type="button" id="cloudCopyBiz">Copy</button></p>
+            <h4>Staff</h4>
+            <p class="muted">A staff member creates their own account, verifies their email, and sends you their <b>staff code</b>. <b>Cashier</b>: sells and refunds, sees only their own sales. <b>Manager</b>: also manages products, customers, stock and orders, and sees every sale. <b>Inventory staff</b>: manages products, stock and orders, cannot sell. <b>Auditor</b>: can read everything, changes nothing. Only you manage staff and the business.</p>
+            <form id="staffForm" class="settings-form">
+              <label>Staff code<input name="staffCode" maxlength="128" autocomplete="off" required></label>
+              <label>Name<input name="staffName" maxlength="100" required></label>
+              <label>Role<select name="staffRole"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="inventory">Inventory staff</option><option value="auditor">Auditor (read only)</option></select></label>
+              <button class="button primary" type="submit">Add staff member</button>
+            </form>
+            <div id="staffList"></div>
+          </div>
+          <div id="cloudStaffJoin" class="hidden">
+            <h4>Work for another business (cashier)</h4>
+            <p class="muted">Your staff code: <code id="cloudMyCode"></code> <button class="text-button" type="button" id="cloudCopyMine">Copy</button></p>
+            <form id="joinForm" class="settings-form">
+              <label>Business code from the owner<input name="bizCode" maxlength="128" autocomplete="off" required></label>
+              <button class="button secondary" type="submit">Join business</button>
+            </form>
+          </div>
+          <div id="cloudCashier" class="notice hidden">
+            <strong>You are working as a cashier</strong>
+            <p>This device uses the owner's business. Products come from the owner and cannot be edited here.</p>
+            <button class="button secondary" type="button" id="cloudLeave">Leave this business</button>
+          </div>
+          <button class="button secondary hidden" type="button" id="cloudSignOut">Sign out</button>
+        </div>
         <div class="notice"><strong>Mwakete Marketplace connection</strong><p>The Mwakete adapter is a documented integration boundary. It must be connected to verified existing Mwakete authentication and APIs before marketplace accounts or live inventory are enabled.</p></div>
       </div>
     </section>
@@ -222,16 +546,156 @@
     </section>
     <footer>© <span id="year"></span> Mwakete POS · Built for businesses in Kiribati</footer>
   </main>
+  <div id="refundPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="refundTitle">
+    <div class="modal-card">
+      <h3 id="refundTitle">Refund or return</h3>
+      <p id="refundSale" class="muted"></p>
+      <form id="refundForm" class="settings-form">
+        <div id="refundLines"></div>
+        <label>Return the money as<select name="method" id="refundMethod"></select></label>
+        <label>Reason (optional)<input name="reason" maxlength="200" placeholder="For example: wrong size"></label>
+        <label class="check"><input type="checkbox" name="restock" checked> Put the returned items back in stock on this device</label>
+        <p id="refundTotal" class="muted" role="status" aria-live="polite"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="refundCancel">Cancel</button><button class="button primary" type="submit" id="refundConfirm">Record refund</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="productEditPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="productEditTitle">
+    <div class="modal-card">
+      <h3 id="productEditTitle">Edit product</h3>
+      <form id="productEditForm" class="settings-form">
+        <label>Name<input name="name" required maxlength="100"></label>
+        <label>Price<input name="price" type="number" min="0" step="0.01" required></label>
+        <label>Cost price (stays on this device)<input name="costPrice" type="number" min="0" step="0.01" placeholder="Optional"></label>
+        <label>Barcode / SKU<input name="sku" maxlength="80"></label>
+        <label>Second barcode (optional)<input name="barcode" maxlength="80"></label>
+        <label>Category<input name="category" maxlength="40" list="categoryList"></label>
+        <label>Reorder level<input name="reorderLevel" type="number" min="0" step="1" placeholder="Optional"></label>
+        <label>Unit<select name="unit"></select></label>
+        <label>Description<textarea name="description" maxlength="300" rows="2"></textarea></label>
+        <label>Quantity discounts (one per line, like 10:5 = from 10 units 5% off)<textarea name="qtyBreaks" rows="2" maxlength="120"></textarea></label>
+        <label>Minimum quantity for trade (account) sales<input name="minQty" type="number" min="0" step="1" placeholder="Optional"></label>
+        <label>Picture (stays on this device)<input name="imageFile" type="file" accept="image/*"></label>
+        <label class="check"><input type="checkbox" name="clearImage"> Remove the picture</label>
+        <label class="check"><input type="checkbox" name="archived"> Archived (hidden from the till, kept in reports)</label>
+        <p id="productHistory" class="hist"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="productEditCancel">Cancel</button><button class="button primary" type="submit">Save</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="onboardPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div class="modal-card">
+      <h3 id="onboardTitle">Set up your shop</h3>
+      <form id="onboardForm" class="settings-form">
+        <label>Business name<input name="businessName" maxlength="100" required autocomplete="organization"></label>
+        <label>Currency (3 letters)<input name="currency" maxlength="3" value="AUD" required></label>
+        <label>Edition<select name="edition"><option value="counter">Counter: simple selling (micro shop)</option><option value="retail" selected>Retail: receipts, customers, reports</option><option value="wholesale">Wholesale: invoices, trade customers, quotes</option></select></label>
+        <fieldset class="packs-box"><legend>Payments you accept (cash is always on)</legend>
+          <label class="check"><input type="checkbox" name="m_eftpos" checked> EFTPOS / card</label>
+          <label class="check"><input type="checkbox" name="m_internet_banking"> Internet banking</label>
+          <label class="check"><input type="checkbox" name="m_mpaisa" checked> M-PAiSA</label>
+          <label class="check"><input type="checkbox" name="m_other"> Other</label>
+        </fieldset>
+        <label>Name for this device<input name="deviceName" maxlength="30" value="Front till" required></label>
+        <p id="onboardError" class="low" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="onboardCancel">Cancel</button><button class="button primary" type="submit">Save and start selling</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="scanPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+    <div class="modal-card">
+      <h3 id="scanTitle">Scan with the camera</h3>
+      <video id="scanVideo" class="scan-video" playsinline muted aria-label="Camera view"></video>
+      <p id="scanStatus" class="hint" role="status" aria-live="polite">Point the camera at a barcode.</p>
+      <p class="hint">No luck? Close this and type the number in the search box.</p>
+      <div class="modal-actions"><button class="button secondary hidden" type="button" id="scanTorch" aria-pressed="false">Light</button><button class="button primary" type="button" id="scanClose">Done</button></div>
+    </div>
+  </div>
+  <div id="approvePanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="approveTitle">
+    <div class="modal-card">
+      <h3 id="approveTitle">Manager approval needed</h3>
+      <p id="approveReason" class="muted"></p>
+      <form id="approveForm" class="settings-form">
+        <label>Manager PIN<input name="pin" id="approvePin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" required></label>
+        <p id="approveError" class="low" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="approveCancel">Cancel</button><button class="button primary" type="submit">Approve</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="lockScreen" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+    <div class="modal-card">
+      <h3 id="lockTitle">Locked</h3>
+      <p class="muted">Enter your PIN to continue. Your sales and the cart are safe.</p>
+      <form id="lockForm" class="settings-form">
+        <label>PIN<input name="pin" id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" required></label>
+        <p id="lockError" class="low" role="alert"></p>
+        <button class="button primary" type="submit">Unlock</button>
+      </form>
+    </div>
+  </div>
+  <div id="txnPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="txnTitle">
+    <div class="modal-card">
+      <h3 id="txnTitle">Sale details</h3>
+      <div id="txnBody"></div>
+      <div class="modal-actions"><button class="button secondary hidden" type="button" id="txnCancelSale">Cancel this sale…</button><button class="button secondary hidden" type="button" id="txnCorrect">Correct this sale…</button><button class="button secondary" type="button" id="txnSend">Send receipt…</button><button class="button primary" type="button" id="txnClose">Close</button></div>
+    </div>
+  </div>
+  <div id="deliveryPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deliveryTitle">
+    <div class="modal-card">
+      <h3 id="deliveryTitle">Send a receipt</h3>
+      <p class="hint">This opens your own email, SMS or WhatsApp app with the receipt filled in. Only send a receipt to a customer who asked for it. The app cannot see whether the message went, so you confirm it afterwards.</p>
+      <form id="deliveryForm" class="settings-form">
+        <label>Send by<select name="channel" id="deliveryChannel"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
+        <label>To (phone with country code, or email)<input name="to" id="deliveryTo" required maxlength="120" autocomplete="off"></label>
+        <label>Message<textarea name="text" id="deliveryText" rows="5" maxlength="2000"></textarea></label>
+        <div id="shareBox" class="retail-box hidden">
+          <p class="hint">Or attach the receipt as a file and pick WhatsApp, email or Messenger from your phone's share list:</p>
+          <div class="row-actions"><button class="button secondary" type="button" id="deliveryShareImg">Share as picture</button><button class="button secondary" type="button" id="deliverySharePdf">Share as PDF</button></div>
+        </div>
+        <p id="deliveryError" class="low" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" type="button" id="deliveryCancel">Cancel</button><button class="button secondary" type="button" id="deliveryQueue">Add to queue</button><button class="button primary" type="submit">Send now</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="heldPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="heldTitle">
+    <div class="modal-card">
+      <h3 id="heldTitle">Held sales</h3>
+      <div id="heldList"></div>
+      <div class="modal-actions"><button class="button primary" type="button" id="heldClose">Close</button></div>
+    </div>
+  </div>
   <div id="receiptPanel" class="modal hidden" role="dialog" aria-modal="true" aria-label="Receipt">
     <div class="modal-card">
       <div id="receiptBody"></div>
-      <div class="modal-actions"><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
+      <div class="modal-actions"><button id="receiptRefund" class="button secondary" type="button" data-feature="refunds" hidden>Refund…</button><button id="receiptDelivery" class="button secondary" type="button" data-feature="quotes" hidden>Delivery note</button><button id="receiptSend" class="button secondary" type="button">Send / share…</button><button id="receiptPrint" class="button secondary" type="button">Print</button><button id="receiptCopy" class="button secondary" type="button">Copy</button><button id="receiptClose" class="button primary" type="button">Close</button></div>
     </div>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="./js/db.js"></script>
   <script src="./js/integrations/google.js"></script>
   <script src="./js/integrations/mwakete.js"></script>
+  <script src="./js/integrations/mwakete-ui.js"></script>
+  <script src="./js/integrations/firebase-config.js"></script>
+  <script src="./js/integrations/firebase.js"></script>
+  <script src="./js/cloud-ui.js"></script>
+  <script src="./js/checkout.js"></script>
+  <script src="./js/catalogue.js"></script>
+  <script src="./js/txn.js"></script>
+  <script src="./js/delivery.js"></script>
+  <script src="./js/receiptshare.js"></script>
+  <script src="./js/analytics.js"></script>
+  <script src="./js/security.js"></script>
+  <script src="./js/scan.js"></script>
+  <script src="./js/pwa.js"></script>
+  <script src="./js/onboarding.js"></script>
+  <script src="./js/refunds.js"></script>
+  <script src="./js/register.js"></script>
+  <script src="./js/cloudreport.js"></script>
+  <script src="./js/backup.js"></script>
+  <script src="./js/diagnostics.js"></script>
+  <script src="./js/csv.js"></script>
+  <script src="./js/stock.js"></script>
+  <script src="./js/trade.js"></script>
   <script src="./js/invoices.js"></script>
   <script src="./js/sync.js"></script>
   <script src="./js/tiers.js"></script>
@@ -239,10 +703,28 @@
   <script src="./js/wholesale.js"></script>
   <script src="./js/wholesale-ui.js"></script>
   <script src="./js/invoices-ui.js"></script>
+  <script src="./js/checkout-ui.js"></script>
+  <script src="./js/catalogue-ui.js"></script>
+  <script src="./js/txn-ui.js"></script>
+  <script src="./js/delivery-ui.js"></script>
+  <script src="./js/analytics-ui.js"></script>
+  <script src="./js/security-ui.js"></script>
+  <script src="./js/scan-ui.js"></script>
+  <script src="./js/pwa-ui.js"></script>
+  <script src="./js/onboarding-ui.js"></script>
+  <script src="./js/refunds-ui.js"></script>
+  <script src="./js/register-ui.js"></script>
+  <script src="./js/csv-ui.js"></script>
+  <script src="./js/backup-ui.js"></script>
+  <script src="./js/cloudreport-ui.js"></script>
+  <script src="./js/stock-ui.js"></script>
+  <script src="./js/quotes-ui.js"></script>
+  <script src="./js/purchasing-ui.js"></script>
   <script src="./js/tier-ui.js"></script>
   <script src="./js/retail-ui.js"></script>
   <script src="./js/guides.js"></script>
   <script src="./js/help.js"></script>
+  <script src="./js/a11y.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>

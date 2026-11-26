@@ -1,0 +1,7 @@
+{
+  "name": "mwakete-pos-a11y-tests",
+  "private": true,
+  "description": "Automated accessibility scan (axe-core) of every screen. Separate from the dependency-free app tests.",
+  "scripts": { "test": "node a11y.e2e.js" },
+  "devDependencies": { "axe-core": "^4.10.0" }
+}

@@ -1,0 +1,576 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// One business per owner. The business document ID is the owner's uid. Every read
+// and write requires a VERIFIED email (request.auth.token.email_verified == true).
+//
+// Roles
+//   owner   : the signed-in user whose uid equals the business ID. Full access.
+//   staff   : a verified user with an ACTIVE document at businesses/{id}/staff/{uid}
+//             (created by the owner) whose role is one of:
+//             cashier   sells and refunds; reads the catalogue; sees only their own records
+//             manager   as cashier, plus products, customers, stock, suppliers, orders; reads all records
+//             inventory products, stock, suppliers, orders; cannot sell
+//             auditor   reads all records; writes nothing
+//             Only the owner manages staff and the business record.
+//
+// Collection: businesses
+// Document ID: {ownerUid}
+// Fields:
+//   - ownerUid: string (required, equals the document ID, immutable)
+//   - name: string (required, 1-100 chars)
+//   - createdAt: number (required, ms since epoch, immutable)
+//   - currency: string (optional, max 8 chars)
+//   - tier: string (optional: counter | retail | wholesale)
+//   - updatedAt: number (optional)
+//
+// Collection: businesses/{id}/staff
+// Document ID: the staff member's uid
+// Fields:
+//   - uid: string (required, equals the document ID, not the owner)
+//   - name: string (required, 1-100 chars)
+//   - role: string (required, "cashier", immutable)
+//   - active: bool (required; set false to remove access, documents are never deleted)
+//   - createdAt: number (required, immutable)
+//
+// Collection: businesses/{id}/sales      (append-only ledger)
+// Document ID: the sale's unique transaction ID (same as the "id" field)
+// Fields:
+//   - id: string (required, equals document ID, max 64 chars)
+//   - staffUid: string (required, equals the writer's uid; audit trail)
+//   - createdAt: number (required)
+//   - items: list (required, 1-200 line items)
+//   - total: number (required, 0 .. 1,000,000,000)
+//   - paymentMethod: string (required, max 30 chars)
+//   - currency, customerId: string (optional)
+//   - paymentVerified: bool (optional; may be true only when paymentMethod is "cash")
+//   - tier (counter|retail|wholesale), subtotal, tax: money numbers (optional)
+//   - discount: map with a money "amount" (optional)
+//   - invoice: map {mode: paid|account, total (must equal the sale total), number, ...} (optional;
+//     an invoice on account must also carry customerId)
+//   - createdAt must be > 0 and at most 7 days after the server time (wrong device clocks tolerated)
+//   - any other POS fields: allowed, max 40 fields in total
+//
+// Collection: businesses/{id}/payments   (append-only ledger)
+// Document ID: the payment's unique ID (same as the "id" field)
+// Fields:
+//   - id, staffUid, customerId: string (required), amount: number (> 0), createdAt: number
+//   - method, note: string (optional)
+//
+// Collection: businesses/{id}/customers  (trade customers; owner writes, members read)
+// Fields: id, name (required); creditLimit, terms, taxNumber (optional)
+//
+// Collection: businesses/{id}/products   (catalogue; owner writes, members read)
+// Fields: id, name, price, updatedAt (required); stock, sku, category, reorderLevel,
+//         prices (map), packs (list), taxExempt (optional)
+//
+// Not enforced here (Firestore rules cannot loop over line items): that a sale's
+// total equals its line items. Prices are chosen by the business's own app.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isVerified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // The verified signed-in user owns the business whose document ID is the uid.
+    function isOwner(businessId) {
+      return isVerified() && request.auth.uid == businessId;
+    }
+
+    function staffPath(businessId) {
+      return /databases/$(database)/documents/businesses/$(businessId)/staff/$(request.auth.uid);
+    }
+
+    function isActiveStaff(businessId) {
+      return isVerified()
+        && exists(staffPath(businessId))
+        && get(staffPath(businessId)).data.active == true;
+    }
+
+    function isMember(businessId) {
+      return isOwner(businessId) || isActiveStaff(businessId);
+    }
+
+    // Staff roles (set by the owner): cashier, manager, inventory, auditor. The owner can do everything.
+    //   cashier   sells and refunds; reads only their own records
+    //   manager   sells; manages products, customers, stock, suppliers, orders; reads every record
+    //   inventory manages products, stock, suppliers, orders; cannot sell
+    //   auditor   reads every record; cannot write anything
+    function hasRole(businessId, roles) {
+      return isActiveStaff(businessId)
+        && get(staffPath(businessId)).data.role in roles;
+    }
+    function canSell(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['cashier', 'manager']);
+    }
+    function canWriteStock(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['cashier', 'manager', 'inventory']);
+    }
+    function canManageCatalogue(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['manager', 'inventory']);
+    }
+    function canManageCustomers(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['manager']);
+    }
+    function canReadAll(businessId) {
+      return isOwner(businessId) || hasRole(businessId, ['manager', 'auditor']);
+    }
+
+    function isShortString(value, maxLen) {
+      return value is string && value.size() >= 1 && value.size() <= maxLen;
+    }
+
+    function isMoney(value) {
+      return value is number && value >= 0 && value <= 1000000000;
+    }
+
+    // A member may only write records that carry their own uid.
+    function writtenByCaller() {
+      return request.resource.data.staffUid == request.auth.uid;
+    }
+
+    // Record timestamps (ms since epoch) must be positive and at most 7 days ahead of the server
+    // clock, so a device with a wrong clock still works but records cannot be dated far in the future.
+    function validTime(ts) {
+      return ts is number && ts > 0 && ts <= request.time.toMillis() + 604800000;
+    }
+
+    function validDiscount(disc) {
+      return disc is map && disc.amount is number && disc.amount >= 0 && disc.amount <= 1000000000;
+    }
+
+    // A tax invoice carried on a sale. Its total must equal the sale total, and an invoice on account
+    // must name the customer, so a forged invoice cannot disagree with the sale it sits on.
+    function validInvoice(d) {
+      let inv = d.invoice;
+      return inv is map
+        && inv.keys().hasAll(['mode', 'total', 'number'])
+        && inv.keys().size() <= 20
+        && inv.mode in ['paid', 'account']
+        && isMoney(inv.total)
+        && inv.total == d.total
+        && isShortString(inv.number, 64)
+        && (inv.mode != 'account' || 'customerId' in d)
+        && (!('tax' in inv) || isMoney(inv.tax))
+        && (!('customerName' in inv) || (inv.customerName is string && inv.customerName.size() <= 100))
+        && (!('customerTaxNumber' in inv) || (inv.customerTaxNumber is string && inv.customerTaxNumber.size() <= 200))
+        && (!('sellerTaxNumber' in inv) || (inv.sellerTaxNumber is string && inv.sellerTaxNumber.size() <= 200))
+        && (!('terms' in inv) || (inv.terms is string && inv.terms.size() <= 200));
+    }
+
+    // ===============================================================
+    // Validator Functions
+    // ===============================================================
+
+    function validBusiness(businessId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['ownerUid', 'name', 'createdAt'])
+        && d.keys().hasOnly(['ownerUid', 'name', 'createdAt', 'currency', 'tier', 'updatedAt'])
+        && d.ownerUid == businessId
+        && isShortString(d.name, 100)
+        && validTime(d.createdAt)
+        && (!('currency' in d) || (d.currency is string && d.currency.size() <= 8))
+        && (!('tier' in d) || d.tier in ['counter', 'retail', 'wholesale'])
+        && (!('updatedAt' in d) || d.updatedAt is number);
+    }
+
+    function validStaff(businessId, staffId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['uid', 'name', 'role', 'active', 'createdAt'])
+        && d.keys().hasAll(['uid', 'name', 'role', 'active', 'createdAt'])
+        && d.uid == staffId
+        && isShortString(staffId, 128)
+        && staffId != businessId
+        && isShortString(d.name, 100)
+        && d.role in ['cashier', 'manager', 'inventory', 'auditor']
+        && d.active is bool
+        && d.createdAt is number;
+    }
+
+    function validSale(saleId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'createdAt', 'items', 'total', 'paymentMethod'])
+        && d.keys().size() <= 40
+        && d.id == saleId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && validTime(d.createdAt)
+        && d.items is list && d.items.size() >= 1 && d.items.size() <= 200
+        && isMoney(d.total)
+        && isShortString(d.paymentMethod, 30)
+        && (!('currency' in d) || (d.currency is string && d.currency.size() <= 8))
+        && (!('customerId' in d) || isShortString(d.customerId, 64))
+        && (!('paymentVerified' in d) || d.paymentVerified is bool)
+        // A recorded non-cash payment is never "verified" (nothing here confirms a digital payment).
+        && (d.paymentMethod == 'cash' || !('paymentVerified' in d) || d.paymentVerified == false)
+        && (!('tier' in d) || d.tier in ['counter', 'retail', 'wholesale'])
+        && (!('subtotal' in d) || isMoney(d.subtotal))
+        && (!('tax' in d) || isMoney(d.tax))
+        && (!('syncStatus' in d) || (d.syncStatus is string && d.syncStatus.size() <= 20))
+        && (!('discount' in d) || validDiscount(d.discount))
+        && (!('receiptNo' in d) || isShortString(d.receiptNo, 30))
+        && (!('rounding' in d) || (d.rounding is number && d.rounding >= -1 && d.rounding <= 1))
+        && (!('deviceId' in d) || isShortString(d.deviceId, 12))
+        && (!('tendered' in d) || isMoney(d.tendered))
+        && (!('change' in d) || isMoney(d.change))
+        && (!('payments' in d) || validPayments(d))
+        && (!('invoice' in d) || validInvoice(d));
+    }
+
+    // Split / multi-method payments: 1-4 lines, known methods, never a verified digital payment.
+    function validPayLine(p) {
+      return p is map
+        && p.keys().hasAll(['method', 'amount'])
+        && p.keys().hasOnly(['method', 'amount', 'reference'])
+        && p.method in ['cash', 'eftpos', 'internet_banking', 'mpaisa', 'other']
+        && isMoney(p.amount)
+        && (!('reference' in p) || (p.reference is string && p.reference.size() <= 40));
+    }
+    function validPayments(d) {
+      return d.payments is list && d.payments.size() >= 1 && d.payments.size() <= 4
+        && validPayLine(d.payments[0])
+        && (d.payments.size() < 2 || validPayLine(d.payments[1]))
+        && (d.payments.size() < 3 || validPayLine(d.payments[2]))
+        && (d.payments.size() < 4 || validPayLine(d.payments[3]));
+    }
+
+    function validPayment(paymentId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'customerId', 'amount', 'createdAt'])
+        && d.keys().size() <= 20
+        && d.id == paymentId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.customerId, 64)
+        && d.amount is number && d.amount > 0 && d.amount <= 1000000000
+        && validTime(d.createdAt)
+        && (!('method' in d) || isShortString(d.method, 30))
+        && (!('note' in d) || (d.note is string && d.note.size() <= 500));
+    }
+
+    function validCustomer(customerId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'name'])
+        && d.keys().hasOnly(['id', 'name', 'creditLimit', 'terms', 'taxNumber'])
+        && d.id == customerId
+        && isShortString(d.id, 64)
+        && isShortString(d.name, 100)
+        && (!('creditLimit' in d) || isMoney(d.creditLimit))
+        && (!('terms' in d) || (d.terms is string && d.terms.size() <= 200))
+        && (!('taxNumber' in d) || (d.taxNumber is string && d.taxNumber.size() <= 50));
+    }
+
+    function validProduct(productId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'name', 'price', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'name', 'price', 'stock', 'sku', 'category', 'reorderLevel', 'prices', 'packs', 'taxExempt', 'description', 'unit', 'archived', 'priceHistory', 'minQty', 'qtyBreaks', 'barcode', 'updatedAt'])
+        && d.id == productId
+        && isShortString(d.id, 64)
+        && d.id.matches('^[A-Za-z0-9_-]+$')
+        && isShortString(d.name, 100)
+        && isMoney(d.price)
+        && d.updatedAt is number
+        && (!('stock' in d) || (d.stock is number && d.stock >= 0 && d.stock <= 1000000000))
+        && (!('sku' in d) || (d.sku is string && d.sku.size() <= 80))
+        && (!('category' in d) || (d.category is string && d.category.size() <= 40))
+        && (!('reorderLevel' in d) || (d.reorderLevel is number && d.reorderLevel >= 0 && d.reorderLevel <= 1000000000))
+        && (!('prices' in d) || (d.prices is map && d.prices.size() <= 20))
+        && (!('packs' in d) || (d.packs is list && d.packs.size() <= 20))
+        && (!('taxExempt' in d) || d.taxExempt is bool)
+        && (!('description' in d) || (d.description is string && d.description.size() <= 300))
+        && (!('unit' in d) || (d.unit is string && d.unit.size() <= 12))
+        && (!('archived' in d) || d.archived is bool)
+        && (!('priceHistory' in d) || (d.priceHistory is list && d.priceHistory.size() <= 20))
+        && (!('barcode' in d) || (d.barcode is string && d.barcode.size() <= 80))
+        && (!('minQty' in d) || (d.minQty is int && d.minQty >= 1 && d.minQty <= 1000000))
+        && (!('qtyBreaks' in d) || (d.qtyBreaks is list && d.qtyBreaks.size() <= 5));
+    }
+
+    function isShortOptional(d, key, maxLen) {
+      return !(key in d) || (d[key] is string && d[key].size() <= maxLen);
+    }
+
+    function validItemList(items) {
+      return items is list && items.size() >= 1 && items.size() <= 200;
+    }
+
+    // A credit note against a sale that already exists in this business. It can never be larger than that
+    // sale, and a credit to a customer's account only against an invoice on account for that customer.
+    // (Rules cannot add up several credit notes: the app tracks what is left, and the owner can audit.)
+    function validRefund(businessId, refundId) {
+      let d = request.resource.data;
+      let salePath = /databases/$(database)/documents/businesses/$(businessId)/sales/$(d.saleId);
+      return d.keys().hasAll(['id', 'staffUid', 'saleId', 'number', 'createdAt', 'items', 'total', 'method'])
+        && d.keys().hasOnly(['id', 'staffUid', 'saleId', 'number', 'createdAt', 'items', 'total', 'method', 'tax', 'currency', 'restock', 'reason', 'customerId', 'invoiceNumber', 'syncStatus'])
+        && d.id == refundId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.saleId, 64)
+        && isShortString(d.number, 64)
+        && validTime(d.createdAt)
+        && validItemList(d.items)
+        && d.total is number && d.total > 0 && d.total <= 1000000000
+        && d.method in ['cash', 'account', 'other']
+        && (!('tax' in d) || isMoney(d.tax))
+        && (!('restock' in d) || d.restock is bool)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'reason', 200)
+        && isShortOptional(d, 'invoiceNumber', 64)
+        && isShortOptional(d, 'syncStatus', 20)
+        && exists(salePath)
+        && d.total <= get(salePath).data.total
+        && (d.method != 'account'
+            || ('customerId' in d
+                && isShortString(d.customerId, 64)
+                && get(salePath).data.invoice.mode == 'account'
+                && get(salePath).data.customerId == d.customerId));
+    }
+
+    // A closed cash-drawer shift. Append-only.
+    function validRegister(registerId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'openedAt', 'closedAt', 'openingFloat', 'countedCash', 'expectedCash', 'difference', 'salesCount'])
+        && d.keys().hasOnly(['id', 'staffUid', 'openedAt', 'closedAt', 'openingFloat', 'countedCash', 'expectedCash', 'difference', 'salesCount', 'cashSales', 'cashRefunds', 'cashPayments', 'note', 'currency', 'syncStatus'])
+        && d.id == registerId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && validTime(d.openedAt)
+        && validTime(d.closedAt)
+        && d.closedAt >= d.openedAt
+        && isMoney(d.openingFloat)
+        && isMoney(d.countedCash)
+        && isMoney(d.expectedCash)
+        && d.difference is number && d.difference >= -1000000000 && d.difference <= 1000000000
+        && d.salesCount is int && d.salesCount >= 0 && d.salesCount <= 10000000
+        && (!('cashSales' in d) || isMoney(d.cashSales))
+        && (!('cashRefunds' in d) || isMoney(d.cashRefunds))
+        && (!('cashPayments' in d) || isMoney(d.cashPayments))
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    // One stock movement (receiving, adjustment, stock-take, damage, return). Append-only.
+    function validStockMove(moveId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'productId', 'delta', 'reason', 'createdAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'productId', 'productName', 'delta', 'reason', 'createdAt', 'refId', 'note', 'deviceId', 'syncStatus'])
+        && d.id == moveId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.productId, 64)
+        && d.delta is number && d.delta != 0 && d.delta >= -1000000000 && d.delta <= 1000000000
+        && d.reason in ['purchase', 'adjustment', 'count', 'damage', 'return', 'correction']
+        && validTime(d.createdAt)
+        && isShortOptional(d, 'productName', 100)
+        && isShortOptional(d, 'refId', 64)
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'deviceId', 12)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    function validSupplier(supplierId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'name', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'name', 'phone', 'note', 'archived', 'updatedAt', 'syncStatus'])
+        && d.id == supplierId
+        && isShortString(d.id, 64)
+        && isShortString(d.name, 100)
+        && validTime(d.updatedAt)
+        && isShortOptional(d, 'phone', 40)
+        && isShortOptional(d, 'note', 200)
+        && (!('archived' in d) || d.archived is bool)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    function validPurchaseOrder(orderId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'number', 'supplierName', 'status', 'items', 'total', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'number', 'supplierId', 'supplierName', 'status', 'items', 'total', 'currency', 'createdAt', 'updatedAt', 'receivedAt', 'note', 'syncStatus'])
+        && d.id == orderId
+        && isShortString(d.id, 64)
+        && isShortString(d.number, 64)
+        && isShortString(d.supplierName, 100)
+        && d.status in ['draft', 'ordered', 'received', 'cancelled']
+        && validItemList(d.items)
+        && isMoney(d.total)
+        && validTime(d.createdAt)
+        && validTime(d.updatedAt)
+        && (!('receivedAt' in d) || validTime(d.receivedAt))
+        && (d.status != 'received' || 'receivedAt' in d)
+        && isShortOptional(d, 'supplierId', 64)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    function validQuote(quoteId) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['id', 'staffUid', 'number', 'customerName', 'status', 'items', 'total', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'staffUid', 'number', 'customerId', 'customerName', 'status', 'items', 'subtotal', 'tax', 'total', 'currency', 'createdAt', 'updatedAt', 'validUntil', 'convertedSaleId', 'note', 'syncStatus'])
+        && d.id == quoteId
+        && isShortString(d.id, 64)
+        && isShortString(d.staffUid, 128)
+        && isShortString(d.number, 64)
+        && isShortString(d.customerName, 100)
+        && d.status in ['open', 'converted', 'declined', 'expired']
+        && validItemList(d.items)
+        && isMoney(d.total)
+        && (!('subtotal' in d) || isMoney(d.subtotal))
+        && (!('tax' in d) || isMoney(d.tax))
+        && validTime(d.createdAt)
+        && validTime(d.updatedAt)
+        && (!('validUntil' in d) || d.validUntil is number)
+        && (d.status != 'converted' || ('convertedSaleId' in d && isShortString(d.convertedSaleId, 64)))
+        && isShortOptional(d, 'customerId', 64)
+        && isShortOptional(d, 'currency', 8)
+        && isShortOptional(d, 'note', 200)
+        && isShortOptional(d, 'syncStatus', 20);
+    }
+
+    // The owner reads everything; a cashier reads only the records they wrote.
+    function canReadRecord(businessId) {
+      return canReadAll(businessId)
+        || (isActiveStaff(businessId) && resource.data.staffUid == request.auth.uid);
+    }
+
+    // ===============================================================
+    // Rules (default deny: anything not listed below is refused)
+    // ===============================================================
+
+    match /businesses/{businessId} {
+      allow read: if isMember(businessId);
+      allow create: if isOwner(businessId) && validBusiness(businessId);
+      allow update: if isOwner(businessId)
+        && validBusiness(businessId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+
+      // Staff list. A cashier can read only their own record (to confirm access).
+      match /staff/{staffId} {
+        allow get: if isOwner(businessId) || (isVerified() && request.auth.uid == staffId);
+        allow list: if isOwner(businessId);
+        allow create: if isOwner(businessId) && validStaff(businessId, staffId);
+        allow update: if isOwner(businessId)
+          && validStaff(businessId, staffId)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if false;
+      }
+
+      // Append-only ledger. A re-send is accepted only if identical to the stored
+      // record and written by the same person, so retries after a lost connection are
+      // safe (idempotent) but a stored sale can never be altered or removed.
+      // Owner reads everything; a cashier reads only records they wrote.
+      match /sales/{saleId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validSale(saleId) && writtenByCaller();
+        allow update: if canSell(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      match /payments/{paymentId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validPayment(paymentId) && writtenByCaller();
+        allow update: if canSell(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      match /customers/{customerId} {
+        allow read: if isMember(businessId);
+        allow create: if canManageCustomers(businessId) && validCustomer(customerId);
+        allow update: if canManageCustomers(businessId) && validCustomer(customerId);
+        allow delete: if false;
+      }
+
+      match /products/{productId} {
+        allow read: if isMember(businessId);
+        allow create: if canManageCatalogue(businessId) && validProduct(productId);
+        // A stale device cannot roll a product back to an older version, and updatedAt cannot be pinned far in the future.
+        allow update: if canManageCatalogue(businessId) && validProduct(productId)
+          && request.resource.data.updatedAt >= resource.data.updatedAt
+          && request.resource.data.updatedAt <= request.time.toMillis() + 604800000;
+        allow delete: if isOwner(businessId);
+      }
+
+      // Credit notes: append-only, same idempotent re-send as sales.
+      match /refunds/{refundId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validRefund(businessId, refundId) && writtenByCaller();
+        allow update: if canSell(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Closed cash-drawer shifts: append-only.
+      match /registers/{registerId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validRegister(registerId) && writtenByCaller();
+        allow update: if canSell(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Stock movements: append-only audit trail.
+      match /stockMoves/{moveId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if canWriteStock(businessId) && validStockMove(moveId) && writtenByCaller();
+        allow update: if canWriteStock(businessId)
+          && request.resource.data == resource.data
+          && resource.data.staffUid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Suppliers and purchase orders: owner only. An order can be edited until it is received or cancelled,
+      // and never rolled back to an older version.
+      match /suppliers/{supplierId} {
+        allow read: if canManageCatalogue(businessId);
+        allow create: if canManageCatalogue(businessId) && validSupplier(supplierId) && writtenByCaller();
+        allow update: if canManageCatalogue(businessId) && validSupplier(supplierId) && writtenByCaller()
+          && request.resource.data.updatedAt >= resource.data.updatedAt;
+        allow delete: if false;
+      }
+
+      match /purchaseOrders/{orderId} {
+        allow read: if canManageCatalogue(businessId);
+        allow create: if canManageCatalogue(businessId) && validPurchaseOrder(orderId) && writtenByCaller();
+        allow update: if canManageCatalogue(businessId) && validPurchaseOrder(orderId) && writtenByCaller()
+          && (request.resource.data == resource.data
+              || (resource.data.status in ['draft', 'ordered']
+                  && request.resource.data.updatedAt >= resource.data.updatedAt
+                  && request.resource.data.createdAt == resource.data.createdAt));
+        allow delete: if false;
+      }
+
+      // Quotes: any member can write one; only the owner or the person who wrote it can change it, and only while open.
+      match /quotes/{quoteId} {
+        allow read: if canReadRecord(businessId);
+        allow create: if canSell(businessId) && validQuote(quoteId) && writtenByCaller();
+        allow update: if canSell(businessId) && validQuote(quoteId)
+          && request.resource.data.staffUid == resource.data.staffUid
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (request.resource.data == resource.data
+              || (resource.data.status == 'open'
+                  && request.resource.data.updatedAt >= resource.data.updatedAt
+                  && (isOwner(businessId) || resource.data.staffUid == request.auth.uid)));
+        allow delete: if false;
+      }
+    }
+  }
+}

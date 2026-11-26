@@ -124,6 +124,10 @@ const RetailCore = (() => {
         (p) =>
           String(p.sku ?? "")
             .trim()
+            .toLowerCase() === c ||
+          // a second barcode (for example a supplier's code on the same item)
+          String(p.barcode ?? "")
+            .trim()
             .toLowerCase() === c,
       ) || null
     );
@@ -147,7 +151,30 @@ const RetailCore = (() => {
         ok: false,
         error: "Note is too long (max " + LIMITS.notes + " characters).",
       };
-    return { ok: true, value: { name, phone, notes } };
+    const email = String(input?.email ?? "").trim();
+    if (
+      email &&
+      (email.length > 120 ||
+        !/^[^\s@]{1,64}@[^\s@]{1,100}\.[^\s@]{2,}$/.test(email))
+    )
+      return {
+        ok: false,
+        error: "Enter a valid email address or leave it empty.",
+      };
+    const address = String(input?.address ?? "").trim();
+    if (address.length > 120)
+      return { ok: false, error: "Address is too long (max 120 characters)." };
+    const category = String(input?.category ?? "").trim();
+    if (category.length > 30)
+      return {
+        ok: false,
+        error: "Customer group is too long (max 30 characters).",
+      };
+    const value = { name, phone, notes };
+    if (email) value.email = email;
+    if (address) value.address = address;
+    if (category) value.category = category;
+    return { ok: true, value };
   }
   async function addCustomer(store, input, id, now = Date.now()) {
     const v = validateCustomer(input);
@@ -180,6 +207,12 @@ const RetailCore = (() => {
     );
   };
   const WIDTH = 32;
+  const PAY_LABEL = {
+    eftpos: "EFTPOS/card",
+    internet_banking: "Internet banking",
+    mpaisa: "M-PAiSA",
+    other: "Other",
+  };
   const row = (left, right) => {
     const l = String(left),
       r = String(right);
@@ -194,7 +227,10 @@ const RetailCore = (() => {
     const cur = sale.currency || "";
     const lines = [
       String(business || "Mwakete POS"),
-      "Receipt: " + sale.id,
+      "Receipt: " +
+        (sale.receiptNo
+          ? sale.receiptNo + " (" + sale.id.slice(0, 8) + ")"
+          : sale.id),
       "Date: " + fmtDate(sale.createdAt),
     ];
     if (customer?.name) lines.push("Customer: " + customer.name);
@@ -215,11 +251,35 @@ const RetailCore = (() => {
       lines.push(row(label, "-" + money(sale.discount.amount)));
     }
     lines.push(row("TOTAL " + cur, money(sale.total)));
-    lines.push(
-      sale.paymentMethod === "cash"
-        ? "Paid: Cash"
-        : "Payment: " + sale.paymentMethod + " (recorded, NOT verified)",
-    );
+    if (Array.isArray(sale.payments) && sale.payments.length) {
+      for (const p of sale.payments) {
+        lines.push(
+          row(
+            p.method === "cash"
+              ? "Cash"
+              : (PAY_LABEL[p.method] || p.method) + " (NOT verified)",
+            money(p.amount),
+          ),
+        );
+        if (p.reference) lines.push("  ref " + p.reference);
+      }
+      if (sale.rounding)
+        lines.push(
+          row(
+            "Cash rounding",
+            (sale.rounding > 0 ? "+" : "") + money(sale.rounding),
+          ),
+        );
+      if (sale.tendered !== undefined) {
+        lines.push(row("Cash received", money(sale.tendered)));
+        lines.push(row("Change", money(sale.change || 0)));
+      }
+    } else
+      lines.push(
+        sale.paymentMethod === "cash"
+          ? "Paid: Cash"
+          : "Payment: " + sale.paymentMethod + " (recorded, NOT verified)",
+      );
     lines.push(
       "Status: " + (sale.syncStatus || "pending") + " (saved on this device)",
     );
@@ -299,7 +359,7 @@ const RetailCore = (() => {
   }
   // `extraHtml` is pre-escaped HTML from a trusted builder (e.g. the Wholesale trade badge).
   function customerRow(c, extraHtml = "") {
-    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div>`;
+    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong>${c.phone ? `<small>${esc(c.phone)}</small>` : ""}${c.email ? `<small>${esc(c.email)}</small>` : ""}${c.category ? `<small>Group: ${esc(c.category)}</small>` : ""}${c.address ? `<small>${esc(c.address)}</small>` : ""}${extraHtml}${c.notes ? `<p class="note-text">${esc(c.notes)}</p>` : ""}</div><div class="row-actions"><button class="text-button" data-history="${esc(c.id)}" aria-label="Purchases by ${esc(c.name)}">Purchases</button><button class="text-button" data-remove-customer="${esc(c.id)}">Remove</button></div></div>`;
   }
   function table(head, rows) {
     return rows.length

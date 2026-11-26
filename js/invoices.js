@@ -167,7 +167,8 @@ const InvoiceCore = (() => {
   const isOpen = (r) =>
     r.syncStatus !== "synced" && r.syncStatus !== "rejected";
   // Amount (major units) this device has recorded but the ledger has not confirmed yet: pending account invoices minus pending payments.
-  function pendingBalance(sales, payments, customerId) {
+  // Credit notes sent to the customer's account (refunds with method "account") reduce it too.
+  function pendingBalance(sales, payments, customerId, refunds) {
     let m = 0;
     for (const s of sales || [])
       if (
@@ -179,6 +180,9 @@ const InvoiceCore = (() => {
         m += toMinor(s.invoice.total);
     for (const p of payments || [])
       if (p.customerId === customerId && isOpen(p)) m -= toMinor(p.amount);
+    for (const r of refunds || [])
+      if (r.method === "account" && r.customerId === customerId && isOpen(r))
+        m -= toMinor(r.total);
     return fromMinor(m);
   }
   // creditLimit undefined/null = no limit set (no check). 0 = no credit allowed.
@@ -342,12 +346,12 @@ const InvoiceCore = (() => {
       invoiceTotal: 0,
       creditLimit: limit,
     });
-    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong><small>Confirmed ${money(confirmed)} (${esc(asOf)}) · pending on this device ${money(pending)} · limit ${limit === undefined || limit === null ? "not set" : money(limit)}</small></div><div class="row-actions"><strong class="${o.over ? "low" : ""}">${money(total)}${o.over ? " · OVER LIMIT" : ""}</strong></div></div>`;
+    return `<div class="resource-row"><div><strong>${esc(c.name)}</strong><small>Confirmed ${money(confirmed)} (${esc(asOf)}) · pending on this device ${money(pending)} · limit ${limit === undefined || limit === null ? "not set" : money(limit)}</small></div><div class="row-actions"><button class="text-button" type="button" data-statement="${esc(c.id)}">Statement</button><strong class="${o.over ? "low" : ""}">${money(total)}${o.over ? " · OVER LIMIT" : ""}</strong></div></div>`;
   }
   function invoiceRow(s) {
     const inv = s.invoice;
     const bad = s.syncStatus === "rejected";
-    return `<div class="resource-row sale-row" data-sale-id="${esc(s.id)}"><div><strong>${esc(inv.number)}</strong><small>${esc(fmtDate(s.createdAt))} · ${esc(inv.customerName)} · ${inv.mode === "account" ? "on account" : "paid"} · ${esc(s.syncStatus || "pending")}${bad && s.syncError ? " — " + esc(s.syncError) : ""}</small></div><strong>${money(inv.total)}</strong></div>`;
+    return `<div class="resource-row sale-row" data-sale-id="${esc(s.id)}" tabindex="0" role="button"><div><strong>${esc(inv.number)}</strong><small>${esc(fmtDate(s.createdAt))} · ${esc(inv.customerName)} · ${inv.mode === "account" ? "on account" : "paid"} · ${esc(s.syncStatus || "pending")}${bad && s.syncError ? " — " + esc(s.syncError) : ""}</small></div><strong>${money(inv.total)}</strong></div>`;
   }
   function paymentRow(p) {
     const bad = p.syncStatus === "rejected";

@@ -64,7 +64,15 @@ const eq = (a, b, msg) => {
     )
       errors.push(m.text());
   });
-  page.on("dialog", (d) => d.accept());
+  let nextDialog = null; // a test step can take over the next dialog; otherwise dialogs are accepted
+  page.on("dialog", (d) => {
+    if (nextDialog) {
+      const h = nextDialog;
+      nextDialog = null;
+      return h(d);
+    }
+    return d.accept();
+  });
 
   console.log("Migration: existing v1 install");
   await page.goto(base + "/__blank");
@@ -169,24 +177,31 @@ const eq = (a, b, msg) => {
     );
   await page.click(".product-card");
   await page.click("#checkout");
-  await page.waitForFunction(
-    async () => (await POSDB.all("sales")).length === 2,
-  );
+  // poll from Node: an async predicate passed to waitForFunction is always truthy
+  for (let i = 0; i < 50; i++) {
+    if ((await page.evaluate(() => POSDB.all("sales"))).length === 2) break;
+    await page.waitForTimeout(100);
+  }
   d = await dump();
   const counterSale = d.s.find((x) => x.id !== "old-s");
   eq(
     Object.keys(counterSale).sort(),
     [
+      "change",
       "createdAt",
       "currency",
+      "deviceId",
       "id",
       "items",
       "paymentMethod",
       "paymentVerified",
+      "payments",
+      "receiptNo",
       "syncStatus",
+      "tendered",
       "total",
     ],
-    "a Counter sale has exactly the original fields (no Retail fields)",
+    "a Counter sale has only the checkout payment fields (no Retail fields)",
   );
   ok(
     !(await page.locator("#receiptPanel").isVisible()),
@@ -275,11 +290,17 @@ const eq = (a, b, msg) => {
     "search box cleared after scan",
   );
   await page.fill("#productSearch", "NOPE");
+  // An unknown barcode now asks whether to add it as a new product; say no here.
+  const asked = new Promise((resolve) => {
+    nextDialog = async (d) => {
+      resolve(d.message());
+      await d.dismiss();
+    };
+  });
   await page.press("#productSearch", "Enter");
-  await page.waitForFunction(() =>
-    /No product with that barcode/.test(
-      document.getElementById("toast").textContent,
-    ),
+  ok(
+    /No product has the barcode NOPE/.test(await asked),
+    "an unknown barcode asks whether to add it as a product",
   );
   eq(await page.textContent("#cartCount"), "1", "unknown barcode adds nothing");
   await page.fill("#productSearch", "");
@@ -362,10 +383,19 @@ const eq = (a, b, msg) => {
   await page.keyboard.press("Escape");
 
   console.log("Offline reload keeps everything");
-  await page.waitForTimeout(500);
+  // The offline reload needs the service worker to have finished caching the app.
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForTimeout(2500);
   await ctx.setOffline(true);
   await page.reload();
   await page.waitForSelector("#productGrid .product-card");
+  await page
+    .waitForFunction(
+      () => typeof TierUI !== "undefined" && !!TierUI.current(),
+      null,
+      { timeout: 10000 },
+    )
+    .catch(() => {});
   eq(
     await page.evaluate(() => TierUI.current()),
     "retail",

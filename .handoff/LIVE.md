@@ -1,32 +1,31 @@
-# Handoff — Mwakete POS Wholesale tier
-Branch: claude/beautiful-fermi-vdsx4j | Draft PR: dsc26support-beep/Mwakete-POS#4 (Wholesale PR 2 of 4). PR #1-#3 merged.
+# handoff: mwakete-pos-live
+project: mwakete-pos
+type: code
+generated: 2026-11-26
+goal: Camera scan on all phones + receipt share (WhatsApp/email) + user recs 2-5 done autonomously. Free only, all tests green before each deploy.
 
-## Goal
-3 tiers in one app (Counter/Retail/Wholesale). Wholesale in 4 PRs: 1 trade selling (merged), 2 invoices + credit ledger (PR #4, draft), 3 purchase orders, 4 quotes + delivery notes.
+## state
+- DEPLOYED (hosting, SW cache v34; rules deployed earlier today). Branch claude/pensive-curie-l1iir1 pushed; draft PR #1. Firebase CLI logged in.
+- Regression green before deploy (unit 382, browser 25 suites, a11y 0, rules 50, cloud e2e). Live: scan-bundled 11/11, CSP 0 violations, sign-in answers.
+- App Check: reCAPTCHA v3 SITE key set in firebase-config.js (public). Not enforced. Secret key NOT with me: user must register site in Firebase console > App Check > Apps > Web.
+- WHY preflight: with reCAPTCHA unreachable, Firebase Auth fails sign-in with network error once App Check is initialised; firebase.js recaptchaReachable() skips App Check for that visit. Reachable-path (real Google) cannot be tested from this sandbox (proxy blocks google.com/recaptcha).
+- docs/DEPLOYMENT.md updated (App Check note) but uncommitted at handoff time unless later commit exists.
 
-## Next steps
-1. User: merge PR #4 (not yet asked/answered).
-2. On go-ahead: plan PR 3 purchase orders / stock-in (suppliers, PO draft->ordered->received, goods-received idempotent by receipt id, append-only StockMovements sync). Then PR 4 quotes + delivery notes (quote->invoice conversion idempotent by quote id).
-3. USER must re-deploy google-apps-script/Code.gs (new app does NOT work with old server) and, only if accepting the risk, set script property LEDGER_ENABLED=true.
-4. Open: Messenger handle moote.nakau? Marketplace URL? Accountant review of tax treatment.
+## next-steps  <!-- resume here -->
+1. User: register reCAPTCHA v3 in Firebase console App Check (secret key there only), test on a real phone (sign in, sync), watch App Check metrics; enforce Firestore only after clean period. Rollback: untick enforcement or empty site key + redeploy.
+2. Open review findings: PIN to change approval limits; restore staffRole/clear business data on reload; refund duplicate/cumulative guard; customers updatedAt guard; backup restore force pending; stronger device code; PBKDF2 PIN; firebase.json ignore *.log/*.md; narrow CSP script-src; precache vendor/* in SW; SHA-256 in vendor/README; Code.gs auth.
+3. Update README counts, CHANGELOG, TESTING, register, PR #1 body.
+4. User: real-phone pilot (camera, share sheet, printer); Kiribati tax check; Mwakete API contract.
 
-## State
-- PR #4 pushed (cb64bf5): js/invoices.js (pure), js/invoices-ui.js, Code.gs schema v2, sync.js rewritten (per-record), IndexedDB v4 (+payments), Accounts tab, guides g-invoices/g-ledger, docs. SW cache v8.
-- Tests: npm test 135/135; test:e2e tiers 41 + wholesale 54 + invoices 59 (real Code.gs via vm behind page.route). Not tested: deployed Apps Script, Android, printers.
+## decisions
+- Camera: bundle MIT reader. Mwakete: closed adapter only. Free only: reCAPTCHA Enterprise API not enabled (needs billing); classic v3 used.
+- Review is self-run, not independent / not legal advice.
 
-## Decisions (user chose)
-- Tax 12.5%, prices before tax, per-product exempt, Wholesale invoices only; discount reduces taxable base pro-rata; tax once per invoice, half-up, cents (BigInt).
-- Ledger NOT production-ready (Apps Script has no verified sign-in); off until owner sets LEDGER_ENABLED=true; credit limit owned by owner's Sheet (client only seeds); balances server-computed.
-- Over limit: warn + confirm, never block (offline). Payments against account balance, not per invoice.
-- Invoice stored ON the sale (atomic); sale.total = gross; reports subtract sale.tax.
-- Server answers per record; synced only when id returned; rejected kept with reason + Retry.
+## gotchas
+- Bash hook: <=10 statements, <=500 chars, no heredocs; use Write for scripts. Scratchpad regress.sh runs everything; csp-check.js / appcheck-diag.js for live checks.
+- Firebase login: use `firebase login <code>` (state persists); fifo/background dies.
+- scan-bundled dup-frame test must wait < 1.5s window.
+- Top-level const not on window; new synced fields need rules + productToCloud/CATALOGUE.
 
-## Gotchas
-- PostToolUse formatter reformats on Edit/Write: patch minified app.js/db.js/service-worker.js via exact-match python script in scratchpad (ruff clean); check git diff --stat.
-- Bash hook: max 500 chars/10 statements; `git push` blocked by sixth-sense, user authorised override -> run scratchpad push.sh.
-- Browser native min/max blocks submit before app validation: e2e sets form.noValidate. e2e needs NODE_PATH=$(npm root -g) for playwright.
-- `const X` in classic scripts is NOT window.X (expose explicitly). Bump SW CACHE + help.js appVersion on JS changes.
-- Stop hooks demand a push each time.
-
-## Open questions
-- Merge PR #4? Plan PR 3? Messenger handle? Marketplace URL?
+## open-questions
+- Real-phone App Check result; pilot results; Mwakete API contract.
